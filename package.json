@@ -73,7 +73,9 @@
       "artifactName": "WorldStageClient-linux-x64.${ext}",
       "target": [
         "AppImage",
-        "deb"
+        "deb",
+        "pacman",
+        "rpm"
       ],
       "category": "Network",
       "desktop": {

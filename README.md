@@ -8,7 +8,7 @@ Current scaffold status:
 
 - Electron app shell with tray/background behavior
 - Electron Builder packaging targets for Linux, Windows, and macOS
-- GitHub release publishing metadata for packaged desktop builds, with stable release asset names for Windows, macOS, Linux AppImage, and Linux `.deb`
+- GitHub release publishing metadata for packaged desktop builds, with stable release asset names for Windows, macOS, Linux AppImage, Linux `.deb`, Linux pacman, and Linux `.rpm` packages
 - Background update checks against the GitHub release channel, plus install/restart controls in the desktop dashboard for packaged builds
 - Persistent config and state stored under app data
 - Optional launch-on-login support for Linux, Windows, and macOS so the home client can come up with the machine instead of requiring a manual app launch
@@ -32,7 +32,7 @@ Current scaffold status:
 
 Packaging targets:
 
-- Linux: `AppImage`, `deb`
+- Linux: `AppImage`, `deb`, `pacman`, `rpm`
 - Windows: `nsis`
 - macOS: `dmg`
 
@@ -44,7 +44,10 @@ Install UX notes:
 - Packaged clients register the `worldstage://` protocol so `5310s.com` can hand a short-lived connection link directly into the installed app
 - The app can also accept the HTTPS fallback pairing link through the manual `Connect With Link` flow if the browser or OS does not pass the custom protocol through automatically
 - Packaged installs check `5310S/worldstage_client` GitHub releases for updates; tagged CI builds can publish those release artifacts directly from GitHub Actions
-- Linux users should prefer the `AppImage` release when they want the easiest updater path; `.deb` remains available as a manual-install option
+- Linux users on Arch-based systems can install the pacman package directly from the GitHub release
+- Linux users on Debian/Ubuntu can use the `.deb` release
+- Linux users on Fedora/openSUSE/RHEL-family systems can use the `.rpm` release
+- Linux users who want the broadest desktop compatibility can use the `AppImage`; it remains the cleanest updater path, but browser-downloaded AppImages may still need execute permission before first launch
 
 Build command:
 

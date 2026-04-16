@@ -50,7 +50,7 @@ async function main() {
   assert.equal(packageJson.build.mac.artifactName, 'WorldStageClient-mac-x64.${ext}', 'Expected a stable mac release asset name for latest-download links.');
   assert.deepEqual(packageJson.build.win.target, ['nsis'], 'Expected Windows packaging target.');
   assert.equal(packageJson.build.win.artifactName, 'WorldStageClient-windows-x64.${ext}', 'Expected a stable Windows release asset name for latest-download links.');
-  assert.deepEqual(packageJson.build.linux.target, ['AppImage', 'deb'], 'Expected Linux packaging targets.');
+  assert.deepEqual(packageJson.build.linux.target, ['AppImage', 'deb', 'pacman', 'rpm'], 'Expected Linux packaging targets.');
   assert.equal(packageJson.build.linux.artifactName, 'WorldStageClient-linux-x64.${ext}', 'Expected stable Linux release asset names for latest-download links.');
 
   const env = buildDesktopDistEnv({
