@@ -1,0 +1,68 @@
+name: worldstage-client-desktop
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            dist_args: --linux --x64
+          - os: windows-latest
+            dist_args: --win --x64
+          - os: macos-latest
+            dist_args: --mac --x64
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build desktop package
+        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: npm run desktop:dist -- ${{ matrix.dist_args }}
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Build and publish GitHub release artifacts
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: npm run desktop:dist -- ${{ matrix.dist_args }}
+        env:
+          WORLDSTAGE_CLIENT_PUBLISH: always
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldstage-client-${{ matrix.os }}
+          path: release/**
+          if-no-files-found: error

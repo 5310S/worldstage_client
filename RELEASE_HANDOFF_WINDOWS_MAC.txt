@@ -1,0 +1,104 @@
+WorldStage Client Release Handoff
+
+Use these prompts as-is for the Codex runs on the Windows and macOS machines.
+
+Windows Codex
+
+You are finishing the Windows release of WorldStage Client.
+
+Repos:
+- worldstage_client: primary repo
+- 5310s.com: only touch this if Windows artifact names, release URLs, or public download/install flow need changes
+
+Current state:
+- GitHub releases are the source of truth for installers and updater feed
+- updater is wired via electron-updater to 5310S/worldstage_client
+- expected Windows asset is `WorldStageClient-windows-x64.exe`
+- public site route `/downloads/worldstage-client/windows` should land users on the Windows installer
+- tagged GitHub Actions builds publish with `WORLDSTAGE_CLIENT_PUBLISH=always`
+- likely remaining gap is real Windows installer verification and possibly signing
+
+Your job:
+1. In `worldstage_client`, run `npm test`.
+2. Build a packaged Windows installer with `npm run desktop:dist -- --win --x64`.
+3. Install that build on this Windows machine and verify:
+- NSIS one-click install works
+- desktop shortcut exists
+- start menu shortcut exists
+- app auto-launches after install
+- close-to-tray behavior works
+- launch-on-login works
+- pairing link flow works from the website or HTTPS fallback
+- packaged build shows updater enabled and can check/open release page
+4. If anything fails, fix the code, tests, and docs.
+5. Do not change Linux behavior unless required.
+6. If Windows signing is the only blocker, do not fake it. Leave the pipeline ready and report the exact missing requirement:
+- `CSC_LINK`
+- `CSC_KEY_PASSWORD`
+7. If you must change artifact names or release paths, update both repos:
+- `worldstage_client` package/workflow/tests
+- `5310s.com` server redirects, downloads page, and tests
+8. If you can validate a real GitHub release publish flow safely, do it. If not, validate everything short of publish and say what blocked the final publish test.
+
+Acceptance criteria:
+- `npm test` passes
+- packaged Windows installer works locally
+- updater state works in the packaged app
+- public download path is still correct if anything changed
+- final response includes:
+  - what you fixed
+  - exact Windows artifact produced
+  - whether the Windows release is production-ready
+  - any remaining blocker
+
+macOS Codex
+
+You are finishing the macOS release of WorldStage Client.
+
+Repos:
+- worldstage_client: primary repo
+- 5310s.com: only touch this if mac artifact names, release URLs, or public download/install flow need changes
+
+Current state:
+- GitHub releases are the source of truth for installers and updater feed
+- updater is wired via electron-updater to 5310S/worldstage_client
+- current expected mac asset is `WorldStageClient-mac-x64.dmg`
+- public site route `/downloads/worldstage-client/macos` should land users on the mac installer
+- tagged GitHub Actions builds publish with `WORLDSTAGE_CLIENT_PUBLISH=always`
+- likely remaining gaps are real DMG verification, signing/notarization, and possibly Apple Silicon support
+
+Your job:
+1. In `worldstage_client`, run `npm test`.
+2. Decide the final mac artifact strategy for end users.
+- Prefer a universal or Apple-Silicon-friendly release if feasible.
+- If you keep x64-only, justify it clearly.
+3. Build the packaged mac release.
+4. Install and verify on this Mac:
+- DMG opens cleanly
+- app installs correctly
+- first launch works
+- close-to-tray behavior works
+- launch-on-login works
+- pairing link flow works from the website or HTTPS fallback
+- packaged build shows updater enabled and can check/open release page
+5. If Apple Silicon support requires artifact-name, workflow, or redirect changes, make those changes end-to-end in both repos.
+6. Do not change Linux behavior unless required.
+7. If signing/notarization is the only blocker, leave the pipeline ready and report the exact missing requirement:
+- `CSC_LINK`
+- `CSC_KEY_PASSWORD`
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
+- `APPLE_TEAM_ID`
+8. If you can validate a real GitHub release publish flow safely, do it. If not, validate everything short of publish and say what blocked the final publish test.
+
+Acceptance criteria:
+- `npm test` passes
+- packaged mac installer works locally
+- updater state works in the packaged app
+- public download path is still correct if anything changed
+- final response includes:
+  - what you fixed
+  - exact mac artifact produced and arch
+  - whether the mac release is production-ready
+  - any remaining blocker
+

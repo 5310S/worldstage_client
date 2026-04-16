@@ -1,0 +1,98 @@
+{
+  "name": "worldstage-client",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Background-capable WorldStage home client scaffold.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/5310S/worldstage_client.git"
+  },
+  "author": {
+    "name": "5310S",
+    "email": "worldstage@5310s.com"
+  },
+  "type": "commonjs",
+  "main": "desktop/main.js",
+  "scripts": {
+    "start": "electron .",
+    "desktop:dist": "node scripts/worldstage-client-dist.js",
+    "desktop:dist:dir": "node scripts/worldstage-client-dist.js --dir",
+    "test": "node tests/client-config.test.js && node tests/pairing-link.test.js && node tests/launch-on-login.test.js && node tests/client-state.test.js && node tests/client-workspace.test.js && node tests/control-plane.test.js && node tests/remote-intents.test.js && node tests/client-agent.test.js && node tests/worldstage-site-window.test.js && node tests/app-updater.test.js && node tests/worldstage-client-dist.test.js && node tests/worldstage-client-release-workflow.test.js"
+  },
+  "devDependencies": {
+    "electron": "^41.1.1",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "build": {
+    "appId": "com.5310s.worldstage.client",
+    "productName": "WorldStage Client",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "lib/**/*",
+      "scripts/**/*",
+      "README.md",
+      "package.json"
+    ],
+    "protocols": [
+      {
+        "name": "WorldStage Connection Link",
+        "schemes": [
+          "worldstage"
+        ]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "5310S",
+        "repo": "worldstage_client",
+        "releaseType": "release"
+      }
+    ],
+    "mac": {
+      "artifactName": "WorldStageClient-mac-x64.${ext}",
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.entertainment"
+    },
+    "win": {
+      "artifactName": "WorldStageClient-windows-x64.${ext}",
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "artifactName": "WorldStageClient-linux-x64.${ext}",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network",
+      "desktop": {
+        "entry": {
+          "Name": "WorldStage Client",
+          "GenericName": "WorldStage Home Client",
+          "Comment": "Keep WorldStage downloads and seeding active while the browser is closed.",
+          "Terminal": "false"
+        }
+      },
+      "maintainer": "5310S <worldstage@5310s.com>"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
+    }
+  }
+}
