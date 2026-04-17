@@ -14,6 +14,7 @@ const {
 const { autoUpdater } = require('electron-updater');
 const { WorldStageClientAgent } = require('../lib/client-agent');
 const { WorldStageAppUpdater } = require('../lib/app-updater');
+const { resolveWorldStageReleaseConfig } = require('../lib/worldstage-release');
 const { syncLaunchOnLogin } = require('../lib/launch-on-login');
 const { WorldStageLocalServer } = require('../lib/worldstage-local-server');
 const {
@@ -176,6 +177,53 @@ function pushSnapshot(snapshot) {
   }
 }
 
+function snapshotWorldStageUpdaterState() {
+  const release = resolveWorldStageReleaseConfig(process.env);
+  const currentVersion = typeof app.getVersion === 'function'
+    ? String(app.getVersion() || '').trim()
+    : '';
+  return {
+    enabled: false,
+    disabledReason: 'updater_unavailable',
+    currentVersion: currentVersion || '0.0.0',
+    latestVersion: '',
+    releaseName: '',
+    releaseNotes: '',
+    releaseDateIso: '',
+    checking: false,
+    available: false,
+    downloaded: false,
+    lastCheckedAtIso: '',
+    lastDownloadedAtIso: '',
+    lastResult: 'idle',
+    lastError: '',
+    progressPercent: 0,
+    transferredBytes: 0,
+    totalBytes: 0,
+    bytesPerSecond: 0,
+    releaseUrl: release.releasesUrl,
+    repoUrl: release.repoUrl,
+    releasesUrl: release.releasesUrl,
+    platform: process.platform,
+    isPackaged: app.isPackaged === true,
+    supportsAutoInstall: process.platform !== 'linux' || Boolean(String(process.env.APPIMAGE || '').trim())
+  };
+}
+
+function worldstageUpdaterState() {
+  const state = updater ? updater.snapshot() : snapshotWorldStageUpdaterState();
+  return {
+    ...state,
+    platform: process.platform,
+    isPackaged: app.isPackaged === true
+  };
+}
+
+function pushWorldStageUpdaterState() {
+  if (!worldstageSiteWindow || worldstageSiteWindow.isDestroyed()) return;
+  worldstageSiteWindow.webContents.send('worldstage-site:updater-state-changed', worldstageUpdaterState());
+}
+
 function syncWorldStageSiteState(patch = {}) {
   Object.assign(worldstageSiteState, patch);
   worldstageSiteState.open = Boolean(worldstageSiteWindow && !worldstageSiteWindow.isDestroyed());
@@ -314,6 +362,10 @@ function attachWorldStageWindowHandlers(window) {
     updateWorldStageLocation(urlValue);
   });
 
+  window.webContents.on('did-finish-load', () => {
+    pushWorldStageUpdaterState();
+  });
+
   window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
     if (isMainFrame === false) return;
     syncWorldStageSiteState({
@@ -347,6 +399,16 @@ async function openWorldStageWindow(options = {}) {
   const targetUrl = String(options.targetUrl || currentWorldStageSiteUrl()).trim() || currentWorldStageSiteUrl();
   const openedAtIso = nowIso();
 
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createMainWindow();
+  }
+
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('main_window_unavailable');
+  }
+
+  worldstageSiteWindow = mainWindow;
+
   if (worldstageSiteWindow && !worldstageSiteWindow.isDestroyed()) {
     syncWorldStageSiteState({
       open: true,
@@ -362,49 +424,19 @@ async function openWorldStageWindow(options = {}) {
     pushSnapshot();
     return decorateSnapshot(agent.snapshot());
   }
-
-  worldstageSiteWindow = new BrowserWindow({
-    width: 1440,
-    height: 960,
-    minWidth: 1100,
-    minHeight: 760,
-    backgroundColor: '#050811',
-    title: 'WorldStage',
-    autoHideMenuBar: true,
-    webPreferences: {
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      webSecurity: true,
-      partition: 'persist:worldstage-site'
-    }
-  });
-
-  attachWorldStageWindowHandlers(worldstageSiteWindow);
-  syncWorldStageSiteState({
-    open: true,
-    visible: true,
-    url: targetUrl,
-    title: 'WorldStage',
-    lastOpenedAtIso: openedAtIso,
-    lastError: ''
-  });
-  await worldstageSiteWindow.loadURL(targetUrl);
-  worldstageSiteWindow.show();
-  pushSnapshot();
-  return decorateSnapshot(agent.snapshot());
 }
 
 async function reloadWorldStageWindow() {
   await ensureWorldStageLocalServerStarted();
-  if (!worldstageSiteWindow || worldstageSiteWindow.isDestroyed()) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
     return openWorldStageWindow({
       forceReload: true
     });
   }
-  await worldstageSiteWindow.loadURL(currentWorldStageSiteUrl());
-  worldstageSiteWindow.show();
-  worldstageSiteWindow.focus();
+  worldstageSiteWindow = mainWindow;
+  await mainWindow.loadURL(currentWorldStageSiteUrl());
+  mainWindow.show();
+  mainWindow.focus();
   syncWorldStageSiteState({
     open: true,
     visible: true,
@@ -417,20 +449,40 @@ async function reloadWorldStageWindow() {
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 1320,
-    height: 900,
-    minWidth: 1080,
+    width: 1440,
+    height: 960,
+    minWidth: 1100,
     minHeight: 760,
-    backgroundColor: '#0a0e16',
+    backgroundColor: '#050811',
+    title: 'WorldStage',
+    autoHideMenuBar: true,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'worldstage-site-preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      partition: 'persist:worldstage-site'
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  worldstageSiteWindow = mainWindow;
+  attachWorldStageWindowHandlers(mainWindow);
+  syncWorldStageSiteState({
+    open: true,
+    visible: true,
+    url: currentWorldStageSiteUrl(),
+    title: 'WorldStage',
+    lastOpenedAtIso: nowIso(),
+    lastError: ''
+  });
+  mainWindow.loadURL(currentWorldStageSiteUrl()).catch((error) => {
+    syncWorldStageSiteState({
+      lastError: String(error && error.message ? error.message : error)
+    });
+    pushSnapshot();
+  });
 
   mainWindow.on('show', () => {
     if (agent) agent.setWindowVisible(true);
@@ -445,6 +497,7 @@ function createMainWindow() {
   });
 
   mainWindow.on('closed', () => {
+    if (worldstageSiteWindow === mainWindow) worldstageSiteWindow = null;
     mainWindow = null;
   });
 }
@@ -791,6 +844,26 @@ function registerIpc() {
     await updater.openReleasePage();
     return decorateSnapshot(agent.snapshot());
   });
+  ipcMain.handle('worldstage-site:get-updater-state', async () => {
+    return worldstageUpdaterState();
+  });
+  ipcMain.handle('worldstage-site:check-for-updates', async () => {
+    if (!updater) return worldstageUpdaterState();
+    await updater.checkForUpdates({
+      manual: true
+    });
+    return worldstageUpdaterState();
+  });
+  ipcMain.handle('worldstage-site:install-update', async () => {
+    if (!updater) throw new Error('updater_unavailable');
+    updater.quitAndInstall();
+    return worldstageUpdaterState();
+  });
+  ipcMain.handle('worldstage-site:open-release-page', async () => {
+    if (!updater) throw new Error('updater_unavailable');
+    await updater.openReleasePage();
+    return worldstageUpdaterState();
+  });
   ipcMain.handle('client:open-worldstage', async () => openWorldStageWindow());
   ipcMain.handle('client:reload-worldstage', async () => reloadWorldStageWindow());
   ipcMain.handle('transport:job-update', async (_event, payload) => {
@@ -886,6 +959,7 @@ app.whenReady().then(async () => {
   updater.onChange(() => {
     refreshTrayMenu();
     pushSnapshot();
+    pushWorldStageUpdaterState();
   });
   updater.initialize();
   agent.on('changed', (snapshot) => {

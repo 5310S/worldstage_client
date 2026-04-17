@@ -12,6 +12,23 @@ const {
   WorldStageLocalServer
 } = require('../lib/worldstage-local-server');
 
+const MOCK_WORLDSTAGE_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>5310S - WorldStage</title>
+</head>
+<body class="worldstage-auth-route">
+  <main>
+    <h1>World Stage</h1>
+    <p>Live upstream WorldStage shell.</p>
+  </main>
+  <script type="module" src="/worldstage-space.js?v=20260415a"></script>
+</body>
+</html>`;
+
+const MOCK_WORLDSTAGE_SPACE_JS = "import * as THREE from 'https://unpkg.com/three@0.179.1/build/three.module.js';\nexport { THREE };";
+
 function reservePort() {
   return new Promise((resolve, reject) => {
     const server = http.createServer(() => {});
@@ -67,7 +84,25 @@ async function startMockWorldStageUpstream(port) {
       authorization
     });
 
-    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/accounts') {
+    if (req.method === 'GET' && (reqUrl.pathname === '/worldstage' || reqUrl.pathname === '/worldstage-login')) {
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store'
+      });
+      res.end(MOCK_WORLDSTAGE_HTML);
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl.pathname === '/worldstage-space.js') {
+      res.writeHead(200, {
+        'Content-Type': 'text/javascript; charset=utf-8',
+        'Cache-Control': 'public, max-age=300'
+      });
+      res.end(MOCK_WORLDSTAGE_SPACE_JS);
+      return;
+    }
+
+    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/auth/register') {
       await readJsonBody(req);
       jsonResponse(res, 201, {
         ok: true,
@@ -77,7 +112,7 @@ async function startMockWorldStageUpstream(port) {
       return;
     }
 
-    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/accounts/login') {
+    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/auth/login') {
       await readJsonBody(req);
       jsonResponse(res, 200, {
         ok: true,
@@ -87,7 +122,7 @@ async function startMockWorldStageUpstream(port) {
       return;
     }
 
-    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/accounts/import') {
+    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/auth/import') {
       await readJsonBody(req);
       jsonResponse(res, 200, {
         ok: true,
@@ -97,7 +132,7 @@ async function startMockWorldStageUpstream(port) {
       return;
     }
 
-    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/accounts/recovery/import') {
+    if (req.method === 'POST' && reqUrl.pathname === '/api/worldstage/auth/recovery/import') {
       await readJsonBody(req);
       jsonResponse(res, 200, {
         ok: true,
@@ -128,6 +163,31 @@ async function startMockWorldStageUpstream(port) {
         ok: true,
         downloads: [
           { videoId: 'vid-1', title: 'Orbit Log', status: 'completed' }
+        ]
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl.pathname === '/api/worldstage/bootstrap') {
+      const token = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : '';
+      if (!state.tokens.has(token)) {
+        jsonResponse(res, 401, { error: 'invalid_auth_token' });
+        return;
+      }
+      jsonResponse(res, 200, {
+        ok: true,
+        summary: { videoCount: 1 },
+        videos: [{ videoId: 'vid-1', title: 'Orbit Log' }],
+        channels: [{ channelId: 'channel-1', title: 'Orbit Channel' }]
+      });
+      return;
+    }
+
+    if (req.method === 'GET' && reqUrl.pathname === '/api/weave/mesh/config') {
+      jsonResponse(res, 200, {
+        ok: true,
+        iceServers: [
+          { urls: ['stun:stun.example.com:3478'] }
         ]
       });
       return;
@@ -205,7 +265,6 @@ async function postJson(url, body, headers = {}) {
 (async () => {
   const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'worldstage-local-server-'));
   const sessionStatePath = path.join(tmpRoot, 'worldstage-browser-sessions.json');
-  const assetsDirectory = path.join(__dirname, '..', 'desktop', 'worldstage');
   const upstreamPort = await reservePort();
   const upstream = await startMockWorldStageUpstream(upstreamPort);
   const upstreamOrigin = `http://127.0.0.1:${upstreamPort}`;
@@ -218,7 +277,6 @@ async function postJson(url, body, headers = {}) {
     site = new WorldStageLocalServer({
       host: '127.0.0.1',
       port: 0,
-      assetsDirectory,
       sessionStatePath,
       siteOrigin: upstreamOrigin,
       getDesktopAuthToken: () => desktopAuthToken,
@@ -244,15 +302,16 @@ async function postJson(url, body, headers = {}) {
     response = await fetch(`${baseUrl}/worldstage-login`, { redirect: 'manual' });
     assert.strictEqual(response.status, 200, 'WorldStage login shell should render publicly.');
     const loginHtml = await response.text();
-    assert.ok(loginHtml.includes('/worldstage-space.js'), 'The copied WorldStage page should include the 3D starfield module.');
+    assert.ok(loginHtml.includes('Live upstream WorldStage shell.'), 'The local bridge should proxy the live WorldStage shell.');
+    assert.ok(loginHtml.includes('/worldstage-space.js?v=20260415a'), 'The proxied WorldStage page should include the current starfield module path.');
     assert.ok(String(response.headers.get('content-security-policy') || '').includes("frame-ancestors 'none'"), 'HTML responses should publish a restrictive CSP.');
     assert.strictEqual(response.headers.get('x-frame-options'), 'DENY', 'HTML responses should deny framing.');
     assert.strictEqual(response.headers.get('referrer-policy'), 'strict-origin-when-cross-origin', 'HTML responses should set a referrer policy.');
     assert.strictEqual(response.headers.get('x-content-type-options'), 'nosniff', 'HTML responses should disable MIME sniffing.');
 
     response = await fetch(`${baseUrl}/worldstage-space.js?v=20260409f`, { redirect: 'manual' });
-    assert.strictEqual(response.status, 200, 'The copied starfield module should be served locally.');
-    assert.ok((await response.text()).includes("import * as THREE"), 'The local starfield module should match the copied Three.js entrypoint.');
+    assert.strictEqual(response.status, 200, 'The upstream starfield module should be proxied locally.');
+    assert.ok((await response.text()).includes("import * as THREE"), 'The proxied starfield module should preserve the upstream Three.js entrypoint.');
 
     response = await postJson(`${baseUrl}/api/worldstage/auth/import`, {
       portableAccount: 'signed-bundle'
@@ -343,6 +402,22 @@ async function postJson(url, body, headers = {}) {
     payload = await response.json();
     assert.ok(Array.isArray(payload.downloads) && payload.downloads.length === 1, 'Downloads should pass through the copied edge.');
 
+    response = await fetch(`${baseUrl}/api/worldstage/bootstrap`, {
+      headers: { Cookie: loginCookieHeader },
+      redirect: 'manual'
+    });
+    assert.strictEqual(response.status, 200, 'Generic WorldStage JSON reads should proxy through the local bridge.');
+    payload = await response.json();
+    assert.strictEqual(payload.summary.videoCount, 1, 'The local bridge should preserve generic WorldStage bootstrap payloads.');
+
+    response = await fetch(`${baseUrl}/api/weave/mesh/config`, {
+      headers: { Cookie: loginCookieHeader },
+      redirect: 'manual'
+    });
+    assert.strictEqual(response.status, 200, 'The local bridge should proxy the ICE config endpoint used by the live shell.');
+    payload = await response.json();
+    assert.ok(Array.isArray(payload.iceServers) && payload.iceServers.length === 1, 'The ICE config payload should pass through unchanged.');
+
     response = await postJson(`${baseUrl}/api/worldstage/me/username`, { username: 'viewer' }, {
       Cookie: loginCookieHeader
     });
@@ -367,6 +442,8 @@ async function postJson(url, body, headers = {}) {
     const usernameCalls = upstream.state.requests.filter((entry) => entry.path === '/api/worldstage/me/username');
     assert.ok(usernameCalls.some((entry) => entry.authorization === 'Bearer ws-auth-login'), 'Protected writes should forward the server-side bearer token upstream.');
     assert.strictEqual(usernameCalls.length, 1, 'Rejected CSRF attempts should not reach the upstream WorldStage write endpoint.');
+    const bootstrapCalls = upstream.state.requests.filter((entry) => entry.path === '/api/worldstage/bootstrap');
+    assert.ok(bootstrapCalls.some((entry) => entry.authorization === 'Bearer ws-auth-login'), 'Generic WorldStage reads should forward the server-side bearer token upstream.');
 
     response = await fetch(`${baseUrl}/worldstage-login`, {
       headers: { Cookie: loginCookieHeader },
