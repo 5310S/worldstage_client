@@ -1,0 +1,1871 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#06070b">
+  <title>5310S - WorldStage</title>
+  <style>
+    :root {
+      --deep-space: #06070b;
+      --ws-font-main: Orbitron;
+      --ws-page-bg: #06070b;
+      --ws-frame-bg: #000000;
+      --ws-surface-bg: rgba(7, 7, 10, 0.86);
+      --ws-panel-bg: rgba(8, 8, 11, 0.75);
+      --ws-search-bg: rgba(255, 255, 255, 0.06);
+      --ws-text-main: #f6f2e7;
+      --ws-text-muted: rgba(246, 242, 231, 0.78);
+      --ws-accent: #c8a46e;
+      --ws-btn-bg: rgba(255, 255, 255, 0.09);
+      --ws-btn-text: #f6f2e7;
+      --ws-border: rgba(255, 255, 255, 0.18);
+      --ws-font-scale: 1;
+      --ws-letter-spacing: 0.06em;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      background-color: var(--ws-page-bg, var(--deep-space));
+      overflow: hidden;
+      position: relative;
+    }
+
+    .worldstage-scene {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .worldstage-overlay {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      min-height: 100svh;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 5vw;
+      perspective: 1800px;
+      opacity: 1;
+    }
+
+    .worldstage-frame-stage {
+      width: 90vw;
+      max-width: 90vw;
+      transform-origin: 50% 50%;
+      transform: scale(0.02);
+      opacity: 1;
+    }
+
+    .worldstage-frame-wrap {
+      width: 100%;
+      animation: worldstage-frame-float 8.5s ease-in-out infinite;
+    }
+
+    .worldstage-frame {
+      width: 100%;
+      min-height: calc(100vh - 10vw);
+      margin: 0 auto;
+      background: var(--ws-frame-bg, #000);
+      transition: background-color 2200ms ease 240ms;
+      border-radius: 28px;
+      box-shadow:
+        0 38px 110px rgba(0, 0, 0, 0.72),
+        0 0 80px rgba(0, 0, 0, 0.46);
+      backdrop-filter: blur(4px);
+      transform: rotateX(5deg) rotateY(-8deg);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .worldstage-frame::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      border: 3px solid rgba(255, 255, 255, 0);
+      box-shadow:
+        0 0 0 rgba(255, 255, 255, 0),
+        0 0 0 rgba(255, 255, 255, 0),
+        inset 0 0 0 rgba(255, 255, 255, 0);
+      transition:
+        border-color 520ms ease,
+        box-shadow 520ms ease;
+    }
+
+    .worldstage-frame.lights-on::after {
+      border-color: rgba(255, 255, 255, 0);
+      box-shadow:
+        0 0 0 rgba(255, 255, 255, 0),
+        0 0 0 rgba(255, 255, 255, 0),
+        inset 0 0 0 rgba(255, 255, 255, 0);
+    }
+
+    .worldstage-message {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(26px, 5vw, 64px);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #f8f4e7;
+      font-weight: 800;
+      transform-style: preserve-3d;
+      transform: none;
+      text-shadow:
+        0 1px 0 #e9d9b6,
+        0 2px 0 #dcc79a,
+        0 3px 0 #ccb27f,
+        0 4px 0 #ba9e68,
+        0 5px 0 #a98a54,
+        0 6px 0 #977744,
+        0 16px 22px rgba(0, 0, 0, 0.62),
+        0 0 26px rgba(255, 223, 164, 0.22);
+      opacity: 0;
+      pointer-events: none;
+      user-select: none;
+      text-align: center;
+      padding: 0 6vw;
+      line-height: 1.15;
+    }
+
+    .worldstage-message.show {
+      animation: worldstage-welcome-fade 4500ms ease forwards;
+    }
+
+    .worldstage-onboarding {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      pointer-events: none;
+      padding: 6vw;
+      transition: opacity 900ms ease;
+    }
+
+    .worldstage-onboarding.show {
+      animation: worldstage-onboarding-fade 900ms ease forwards;
+      pointer-events: auto;
+    }
+
+    .worldstage-onboarding.hide {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .worldstage-frame.authenticated {
+      background: #000;
+    }
+
+    body.worldstage-post-auth .worldstage-overlay {
+      padding: 0;
+      transition: padding 3600ms cubic-bezier(0.16, 0.84, 0.2, 1);
+    }
+
+    body.worldstage-post-auth .worldstage-frame-stage {
+      animation: worldstage-post-auth-zoom 3600ms cubic-bezier(0.16, 0.84, 0.2, 1) forwards;
+    }
+
+    body.worldstage-post-auth .worldstage-frame-wrap {
+      animation: none;
+    }
+
+    body.worldstage-post-auth .worldstage-frame {
+      min-height: 100vh;
+      border-radius: 0;
+      transform: none;
+      box-shadow: none;
+      transition:
+        background-color 2200ms ease 240ms,
+        min-height 3600ms cubic-bezier(0.16, 0.84, 0.2, 1),
+        border-radius 3200ms cubic-bezier(0.16, 0.84, 0.2, 1),
+        transform 3000ms cubic-bezier(0.16, 0.84, 0.2, 1),
+        box-shadow 3000ms cubic-bezier(0.16, 0.84, 0.2, 1);
+    }
+
+    body.worldstage-post-auth .worldstage-frame::after {
+      border-color: rgba(255, 255, 255, 0);
+      box-shadow:
+        0 0 0 rgba(255, 255, 255, 0),
+        0 0 0 rgba(255, 255, 255, 0),
+        inset 0 0 0 rgba(255, 255, 255, 0);
+    }
+
+    @keyframes worldstage-onboarding-fade {
+      0% {
+        opacity: 0;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+
+    @keyframes worldstage-post-auth-zoom {
+      0% {
+        width: 90vw;
+        max-width: 90vw;
+      }
+      72% {
+        width: 102vw;
+        max-width: 102vw;
+      }
+      100% {
+        width: 100vw;
+        max-width: 100vw;
+      }
+    }
+
+    .worldstage-auth-card {
+      width: min(560px, 92%);
+      background: #000;
+      border-radius: 18px;
+      box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.72);
+      padding: clamp(22px, 4.2vw, 36px);
+    }
+
+    .worldstage-auth-title {
+      margin: 0 0 18px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(22px, 4vw, 38px);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #f6f2e7;
+      text-align: center;
+    }
+
+    .worldstage-auth-fields {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .worldstage-auth-fields.register-mode .worldstage-auth-register-only {
+      display: block;
+    }
+
+    .worldstage-auth-register-only {
+      display: none;
+    }
+
+    .worldstage-auth-input {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #f5f7ff;
+      padding: 12px 14px;
+      font: 500 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      outline: none;
+    }
+
+    .worldstage-auth-input::placeholder {
+      color: rgba(245, 247, 255, 0.6);
+    }
+
+    .worldstage-auth-input:focus {
+      border-color: rgba(130, 181, 255, 0.68);
+      box-shadow: 0 0 0 3px rgba(109, 164, 255, 0.2);
+    }
+
+    .worldstage-auth-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .worldstage-auth-btn {
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font: 700 14px/1.1 'Orbitron', sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    .worldstage-auth-btn-login {
+      background: linear-gradient(180deg, #f0d39f 0%, #c8a46e 100%);
+      color: #1c1610;
+    }
+
+    .worldstage-auth-btn-register {
+      background: rgba(255, 255, 255, 0.08);
+      color: #e8ecff;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    .worldstage-auth-status {
+      margin-top: 12px;
+      min-height: 20px;
+      font: 500 13px/1.25 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(232, 236, 255, 0.84);
+      text-align: center;
+    }
+
+    .worldstage-auth-status.error {
+      color: #ffb5b5;
+    }
+
+    .worldstage-auth-status.ok {
+      color: #bdf0c7;
+    }
+
+    .worldstage-auth-helper {
+      margin: -4px 0 2px;
+      font: 500 12px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(232, 236, 255, 0.72);
+    }
+
+    .worldstage-username-setup {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      opacity: 0;
+      pointer-events: none;
+      padding: 6vw;
+      transition: opacity 700ms ease;
+      z-index: 3;
+    }
+
+    .worldstage-username-setup.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .worldstage-username-card {
+      width: min(560px, 92%);
+      background: rgba(0, 0, 0, 0.86);
+      border-radius: 18px;
+      padding: clamp(22px, 4.2vw, 36px);
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.56);
+    }
+
+    .worldstage-username-title {
+      margin: 0 0 14px;
+      font: 700 clamp(18px, 3vw, 30px)/1.2 'Orbitron', sans-serif;
+      letter-spacing: 0.08em;
+      color: #f6f2e7;
+      text-align: center;
+    }
+
+    .worldstage-username-input {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.05);
+      color: #f5f7ff;
+      padding: 12px 14px;
+      font: 500 15px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      outline: none;
+      margin-bottom: 12px;
+    }
+
+    .worldstage-username-input:focus {
+      border-color: rgba(130, 181, 255, 0.68);
+      box-shadow: 0 0 0 3px rgba(109, 164, 255, 0.2);
+    }
+
+    .worldstage-username-submit {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font: 700 14px/1.1 'Orbitron', sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      background: linear-gradient(180deg, #f0d39f 0%, #c8a46e 100%);
+      color: #1c1610;
+    }
+
+    .worldstage-username-status {
+      margin-top: 10px;
+      min-height: 18px;
+      text-align: center;
+      font: 500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      color: rgba(232, 236, 255, 0.82);
+    }
+
+    .worldstage-identity-sequence {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
+      opacity: 0;
+      transition: opacity 420ms ease;
+    }
+
+    .worldstage-identity-sequence.show {
+      opacity: 1;
+    }
+
+    .worldstage-identity-welcome {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      margin: 0;
+      font: 700 clamp(24px, 5.2vw, 54px)/1.08 'Orbitron', sans-serif;
+      letter-spacing: 0.08em;
+      color: #f6f2e7;
+      text-align: center;
+      white-space: nowrap;
+      opacity: 0;
+      text-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+    }
+
+    .worldstage-identity-sequence.show .worldstage-identity-welcome {
+      animation: worldstage-identity-welcome 2200ms ease forwards;
+    }
+
+    .worldstage-identity-fly {
+      display: none;
+    }
+
+    .worldstage-identity-sequence.complete {
+      opacity: 0;
+      transition: opacity 520ms ease;
+    }
+
+    .worldstage-topbar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 15vh;
+      min-height: 84px;
+      max-height: 180px;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      align-items: center;
+      gap: clamp(8px, 1vw, 16px);
+      padding: 0 clamp(14px, 2vw, 28px);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--ws-surface-bg, rgba(7, 7, 10, 0.86)) 100%, black 0%) 0%, color-mix(in srgb, var(--ws-surface-bg, rgba(7, 7, 10, 0.86)) 86%, transparent 14%) 75%, color-mix(in srgb, var(--ws-surface-bg, rgba(7, 7, 10, 0.86)) 58%, transparent 42%) 100%);
+      border-bottom: 1px solid color-mix(in srgb, var(--ws-border, rgba(255,255,255,0.18)) 85%, transparent 15%);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 520ms ease;
+    }
+
+    .worldstage-topbar-left,
+    .worldstage-topbar-center,
+    .worldstage-topbar-right {
+      display: flex;
+      align-items: center;
+      gap: clamp(8px, 1vw, 14px);
+      min-width: 0;
+    }
+
+    .worldstage-topbar-left {
+      justify-self: start;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
+
+    .worldstage-topbar-center {
+      justify-self: center;
+      width: min(42vw, 620px);
+      justify-content: center;
+    }
+
+    .worldstage-topbar-right {
+      justify-self: end;
+      justify-content: flex-end;
+      white-space: nowrap;
+    }
+
+    body.worldstage-main-ready .worldstage-topbar {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .worldstage-topbar-brand {
+      font: 700 clamp(14px, calc(1.4vw * var(--ws-font-scale, 1)), 20px)/1 var(--ws-font-main), sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--ws-text-main);
+      white-space: nowrap;
+    }
+
+    .worldstage-topbar-username {
+      font: 700 clamp(14px, calc(1.4vw * var(--ws-font-scale, 1)), 20px)/1 var(--ws-font-main), sans-serif;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: color-mix(in srgb, var(--ws-text-main) 92%, transparent 8%);
+      white-space: nowrap;
+      min-width: 0;
+      max-width: 18vw;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .worldstage-topbar-search-wrap {
+      position: relative;
+      flex: 1 1 auto;
+      min-width: 180px;
+      max-width: none;
+      height: clamp(34px, 4.2vh, 44px);
+      border-radius: 10px;
+      border: 1px solid var(--ws-border);
+      background: var(--ws-search-bg);
+    }
+
+    .worldstage-topbar-search-icon {
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      align-items: center;
+      justify-content: center;
+      display: inline-flex;
+      width: clamp(46px, 4.8vh, 58px);
+      border: 0;
+      border-right: 1px solid var(--ws-border);
+      border-radius: 10px 0 0 10px;
+      background: color-mix(in srgb, var(--ws-search-bg) 88%, white 12%);
+      color: var(--ws-text-main);
+      opacity: 0.92;
+      cursor: pointer;
+    }
+
+    .worldstage-topbar-search-icon svg {
+      width: 78%;
+      height: 78%;
+      display: block;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .worldstage-topbar-search {
+      width: 100%;
+      height: 100%;
+      border-radius: 10px;
+      border: 0;
+      background: transparent;
+      color: var(--ws-text-main);
+      padding: 0 clamp(10px, 1.1vw, 14px);
+      padding-left: clamp(56px, 5.8vh, 70px);
+      font: 500 14px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      outline: none;
+    }
+
+    .worldstage-topbar-search-wrap:focus-within {
+      border-color: rgba(130, 181, 255, 0.68);
+      box-shadow: 0 0 0 3px rgba(109, 164, 255, 0.2);
+    }
+
+    .worldstage-topbar-btn {
+      height: clamp(34px, 4.2vh, 44px);
+      border: 0;
+      border-radius: 10px;
+      padding: 0 clamp(7px, 0.65vw, 12px);
+      font: 700 clamp(10px, calc(0.75vw * var(--ws-font-scale, 1)), 13px)/1 var(--ws-font-main), sans-serif;
+      letter-spacing: var(--ws-letter-spacing);
+      text-transform: uppercase;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .worldstage-topbar-btn-go {
+      background: linear-gradient(180deg, color-mix(in srgb, var(--ws-accent) 62%, white 38%) 0%, var(--ws-accent) 100%);
+      color: #1c1610;
+    }
+
+    .worldstage-topbar-btn-neutral {
+      background: var(--ws-btn-bg);
+      color: var(--ws-btn-text);
+      border: 1px solid var(--ws-border);
+    }
+
+    body.worldstage-my-account-transition .worldstage-topbar-left,
+    body.worldstage-my-account-transition .worldstage-topbar-center,
+    body.worldstage-my-account-transition .worldstage-topbar-right > :not(#worldstage-my-account) {
+      opacity: 0;
+      transition: opacity 520ms ease;
+      pointer-events: none;
+    }
+
+    body.worldstage-my-account-transition .worldstage-topbar-right,
+    body.worldstage-my-account-transition #worldstage-my-account {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #worldstage-my-account {
+      transition: opacity 520ms ease;
+    }
+
+    body.worldstage-my-account-button-fade #worldstage-my-account {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    body.worldstage-my-account-transition .worldstage-topbar {
+      opacity: 0 !important;
+      pointer-events: none !important;
+      transition: opacity 520ms ease !important;
+    }
+
+    .worldstage-my-account-ghost {
+      position: fixed;
+      z-index: 20;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.09);
+      color: #f6f2e7;
+      font: 700 clamp(10px, 0.75vw, 13px)/1 'Orbitron', sans-serif;
+      letter-spacing: 0.045em;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 1;
+      transition: opacity 520ms ease;
+      white-space: nowrap;
+    }
+
+    body.worldstage-my-account-button-fade .worldstage-my-account-ghost {
+      opacity: 0;
+    }
+
+    body.worldstage-my-account-transition .worldstage-my-account-ghost {
+      animation: worldstage-my-account-ghost-fade 1920ms ease forwards;
+    }
+
+    body.worldstage-my-account-transition .worldstage-account-view {
+      animation: worldstage-account-view-in 700ms ease 1920ms forwards;
+    }
+
+    @keyframes worldstage-my-account-ghost-fade {
+      0% {
+        opacity: 1;
+      }
+      79% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes worldstage-account-view-in {
+      0% {
+        opacity: 0;
+      }
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .worldstage-account-view {
+      position: absolute;
+      inset: 0;
+      z-index: 6;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 700ms ease;
+      display: flex;
+      justify-content: flex-start;
+      align-items: flex-start;
+      padding-top: clamp(90px, 16vh, 170px);
+      flex-direction: column;
+      padding-left: clamp(20px, 5vw, 64px);
+      padding-right: clamp(20px, 5vw, 64px);
+    }
+
+    .worldstage-account-view.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .worldstage-account-title {
+      margin: 0;
+      font: 700 clamp(28px, 4.2vw, 56px)/1.08 'Orbitron', sans-serif;
+      letter-spacing: 0.08em;
+      color: #f6f2e7;
+      text-transform: uppercase;
+      text-align: center;
+      text-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+      width: 100%;
+    }
+
+    .worldstage-account-menus {
+      margin: clamp(18px, 3.4vh, 34px) auto 0;
+      width: min(1100px, 100%);
+      display: grid;
+      gap: 12px;
+    }
+
+    .worldstage-account-menu {
+      border: 1px solid var(--ws-border);
+      border-radius: 12px;
+      background: var(--ws-panel-bg);
+      overflow: hidden;
+    }
+
+    .worldstage-account-menu-trigger {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 0;
+      background: color-mix(in srgb, var(--ws-panel-bg) 82%, white 18%);
+      color: var(--ws-text-main);
+      padding: 14px 16px;
+      font: 700 clamp(13px, calc(1vw * var(--ws-font-scale, 1)), 16px)/1 var(--ws-font-main), sans-serif;
+      letter-spacing: var(--ws-letter-spacing);
+      text-transform: uppercase;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .worldstage-account-menu-caret {
+      font-size: 14px;
+      opacity: 0.88;
+      transition: transform 260ms ease;
+    }
+
+    .worldstage-account-menu[data-open='true'] .worldstage-account-menu-caret {
+      transform: rotate(180deg);
+    }
+
+    .worldstage-account-menu-panel {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height 340ms ease, opacity 260ms ease, padding 260ms ease;
+      padding: 0 16px;
+    }
+
+    .worldstage-account-menu[data-open='true'] .worldstage-account-menu-panel {
+      max-height: 360px;
+      opacity: 1;
+      padding: 12px 16px 16px;
+    }
+
+    .worldstage-account-hosted-status {
+      margin: 0 0 10px;
+      color: var(--ws-text-muted);
+      font: 500 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    .worldstage-account-hosted-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 8px;
+    }
+
+    .worldstage-account-hosted-item {
+      border: 1px solid color-mix(in srgb, var(--ws-border) 75%, transparent 25%);
+      border-radius: 10px;
+      background: color-mix(in srgb, var(--ws-panel-bg) 78%, white 22%);
+      padding: 10px 12px;
+      color: var(--ws-text-main);
+      font: 600 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    .worldstage-account-hosted-empty {
+      color: color-mix(in srgb, var(--ws-text-main) 70%, transparent 30%);
+      font-weight: 500;
+    }
+
+    .worldstage-account-menu-note {
+      margin: 0;
+      color: color-mix(in srgb, var(--ws-text-main) 72%, transparent 28%);
+      font: 500 13px/1.35 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    }
+
+    .worldstage-custom-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(180px, 1fr));
+      gap: 10px 12px;
+      margin-top: 4px;
+    }
+
+    .worldstage-custom-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .worldstage-custom-label {
+      color: var(--ws-text-muted);
+      font: 600 12px/1.1 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .worldstage-custom-input,
+    .worldstage-custom-select {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid var(--ws-border);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--ws-panel-bg) 80%, white 20%);
+      color: var(--ws-text-main);
+      padding: 6px 10px;
+      font: 500 13px/1.2 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      outline: none;
+    }
+
+    .worldstage-custom-input[type='color'] {
+      padding: 3px;
+      min-height: 36px;
+    }
+
+    .worldstage-custom-reset {
+      margin-top: 12px;
+      border: 1px solid var(--ws-border);
+      border-radius: 10px;
+      background: var(--ws-btn-bg);
+      color: var(--ws-btn-text);
+      padding: 9px 12px;
+      font: 700 12px/1 var(--ws-font-main), sans-serif;
+      letter-spacing: var(--ws-letter-spacing);
+      text-transform: uppercase;
+      cursor: pointer;
+    }
+
+    @media (max-width: 1600px) {
+      .worldstage-topbar {
+        gap: 10px;
+      }
+
+      .worldstage-topbar-brand,
+      .worldstage-topbar-username {
+        font-size: clamp(12px, 1.15vw, 17px);
+      }
+    }
+
+    @media (max-width: 1320px) {
+      .worldstage-topbar {
+        padding-left: 12px;
+        padding-right: 12px;
+        gap: 8px;
+      }
+
+      .worldstage-topbar-center {
+        width: min(38vw, 500px);
+      }
+
+      .worldstage-topbar-btn {
+        padding-left: 8px;
+        padding-right: 8px;
+        letter-spacing: 0.04em;
+      }
+    }
+
+    @media (max-width: 1160px) {
+      .worldstage-topbar-center {
+        width: min(34vw, 420px);
+      }
+
+      .worldstage-topbar-brand,
+      .worldstage-topbar-username {
+        font-size: clamp(11px, 1.05vw, 14px);
+      }
+
+      .worldstage-topbar-btn {
+        font-size: clamp(9px, 0.66vw, 11px);
+        padding-left: 6px;
+        padding-right: 6px;
+      }
+    }
+
+    @keyframes worldstage-identity-welcome {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -47%);
+      }
+      20% {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+      }
+      68% {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -52%);
+      }
+    }
+
+    @keyframes worldstage-welcome-fade {
+      0% {
+        opacity: 0;
+      }
+      30% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+
+    @keyframes worldstage-frame-float {
+      0%,
+      100% {
+        transform: translate3d(0, 0, 0);
+      }
+      50% {
+        transform: translate3d(0, -16px, 0);
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas class="worldstage-scene" id="worldstage-scene" aria-hidden="true"></canvas>
+  <div class="worldstage-overlay">
+    <div class="worldstage-frame-stage">
+      <div class="worldstage-frame-wrap">
+        <div class="worldstage-frame">
+          <div class="worldstage-message" id="worldstage-welcome" aria-hidden="true">Welcome to the World Stage</div>
+          <div class="worldstage-onboarding" id="worldstage-onboarding" aria-hidden="true">
+            <div class="worldstage-auth-card">
+              <h1 class="worldstage-auth-title">World Stage</h1>
+              <div class="worldstage-auth-fields">
+                <input class="worldstage-auth-input" id="worldstage-auth-email" type="text" autocomplete="username" placeholder="Email or Username">
+                <input class="worldstage-auth-input" id="worldstage-auth-password" type="password" autocomplete="current-password" placeholder="Password">
+                <input class="worldstage-auth-input worldstage-auth-register-only" id="worldstage-auth-password-confirm" type="password" autocomplete="new-password" placeholder="Confirm Password">
+              </div>
+              <div class="worldstage-auth-actions">
+                <button class="worldstage-auth-btn worldstage-auth-btn-login" id="worldstage-auth-login" type="button">Login</button>
+                <button class="worldstage-auth-btn worldstage-auth-btn-register" id="worldstage-auth-register" type="button">Register</button>
+              </div>
+              <p class="worldstage-auth-status" id="worldstage-auth-status" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="worldstage-username-setup" id="worldstage-username-setup" aria-hidden="true">
+            <div class="worldstage-username-card">
+              <h2 class="worldstage-username-title">Please type a username</h2>
+              <input class="worldstage-username-input" id="worldstage-username-input" type="text" maxlength="32" autocomplete="nickname" placeholder="Username">
+              <button class="worldstage-username-submit" id="worldstage-username-submit" type="button">Submit</button>
+              <p class="worldstage-username-status" id="worldstage-username-status" aria-live="polite"></p>
+            </div>
+          </div>
+          <div class="worldstage-identity-sequence" id="worldstage-identity-sequence" aria-hidden="true">
+            <p class="worldstage-identity-welcome">Welcome, <span id="worldstage-welcome-username"></span></p>
+            <div class="worldstage-identity-fly" id="worldstage-identity-fly"></div>
+          </div>
+          <div class="worldstage-topbar" id="worldstage-topbar" aria-hidden="true">
+            <div class="worldstage-topbar-left">
+              <div class="worldstage-topbar-brand">World Stage</div>
+              <div class="worldstage-topbar-username" id="worldstage-topbar-username"></div>
+            </div>
+            <div class="worldstage-topbar-center">
+              <div class="worldstage-topbar-search-wrap">
+                <button class="worldstage-topbar-search-icon" id="worldstage-search-icon" type="button" aria-label="Search">
+                  <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+                    <circle cx="11" cy="11" r="6.5"></circle>
+                    <path d="M16 16 L21 21"></path>
+                  </svg>
+                </button>
+                <input class="worldstage-topbar-search" id="worldstage-search-input" type="text" placeholder="Search">
+              </div>
+              <button class="worldstage-topbar-btn worldstage-topbar-btn-go" id="worldstage-search-go" type="button">Go</button>
+            </div>
+            <div class="worldstage-topbar-right">
+              <button class="worldstage-topbar-btn worldstage-topbar-btn-neutral" id="worldstage-my-account" type="button">My Account</button>
+              <button class="worldstage-topbar-btn worldstage-topbar-btn-neutral" id="worldstage-hosted-videos" type="button">Hosted Videos</button>
+              <button class="worldstage-topbar-btn worldstage-topbar-btn-neutral" id="worldstage-mining" type="button">Mining</button>
+              <button class="worldstage-topbar-btn worldstage-topbar-btn-neutral" id="worldstage-portal" type="button">Portal</button>
+            </div>
+          </div>
+          <div class="worldstage-account-view" id="worldstage-account-view" aria-hidden="true">
+            <h2 class="worldstage-account-title" id="worldstage-account-title">Account</h2>
+            <div class="worldstage-account-menus">
+              <section class="worldstage-account-menu" id="worldstage-account-menu-hosted" data-open="true">
+                <button class="worldstage-account-menu-trigger" id="worldstage-account-menu-hosted-trigger" type="button" aria-expanded="true" aria-controls="worldstage-account-menu-hosted-panel">
+                  Hosted Videos
+                  <span class="worldstage-account-menu-caret">▾</span>
+                </button>
+                <div class="worldstage-account-menu-panel" id="worldstage-account-menu-hosted-panel">
+                  <p class="worldstage-account-hosted-status" id="worldstage-account-hosted-status">Loading hosted videos…</p>
+                  <ul class="worldstage-account-hosted-list" id="worldstage-account-hosted-list"></ul>
+                </div>
+              </section>
+              <section class="worldstage-account-menu" id="worldstage-account-menu-wallet" data-open="false">
+                <button class="worldstage-account-menu-trigger" id="worldstage-account-menu-wallet-trigger" type="button" aria-expanded="false" aria-controls="worldstage-account-menu-wallet-panel">
+                  Wallet
+                  <span class="worldstage-account-menu-caret">▾</span>
+                </button>
+                <div class="worldstage-account-menu-panel" id="worldstage-account-menu-wallet-panel">
+                  <p class="worldstage-account-menu-note">Wallet controls coming next.</p>
+                </div>
+              </section>
+              <section class="worldstage-account-menu" id="worldstage-account-menu-customize" data-open="false">
+                <button class="worldstage-account-menu-trigger" id="worldstage-account-menu-customize-trigger" type="button" aria-expanded="false" aria-controls="worldstage-account-menu-customize-panel">
+                  Customize
+                  <span class="worldstage-account-menu-caret">▾</span>
+                </button>
+                <div class="worldstage-account-menu-panel" id="worldstage-account-menu-customize-panel">
+                  <div class="worldstage-custom-grid">
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-preset">Theme Preset</label>
+                      <select class="worldstage-custom-select" id="worldstage-custom-preset">
+                        <option value="">Custom</option>
+                        <option value="midnight">Midnight Gold</option>
+                        <option value="aurora">Aurora Ice</option>
+                        <option value="ember">Solar Ember</option>
+                        <option value="mint">Neon Mint</option>
+                        <option value="royal">Royal Blue</option>
+                        <option value="rose">Rose Quartz</option>
+                        <option value="mono">Monochrome</option>
+                        <option value="retro">Retro Terminal</option>
+                      </select>
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-font">Font</label>
+                      <select class="worldstage-custom-select" id="worldstage-custom-font">
+                        <option value="Orbitron">Orbitron</option>
+                        <option value="Exo 2">Exo 2</option>
+                        <option value="Rajdhani">Rajdhani</option>
+                        <option value="Audiowide">Audiowide</option>
+                        <option value="Space Grotesk">Space Grotesk</option>
+                        <option value="Montserrat">Montserrat</option>
+                        <option value="Oswald">Oswald</option>
+                        <option value="System UI">System UI</option>
+                      </select>
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-scale">Text Size</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-scale" type="range" min="85" max="135" step="1" value="100">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-spacing">Letter Spacing</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-spacing" type="range" min="2" max="18" step="1" value="6">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-page-bg">Page Background</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-page-bg" type="color" value="#06070b">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-frame-bg">Frame Background</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-frame-bg" type="color" value="#000000">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-text-main">Primary Text</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-text-main" type="color" value="#f6f2e7">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-accent">Accent</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-accent" type="color" value="#c8a46e">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-surface">Top Surface</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-surface" type="color" value="#090a0f">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-panel">Panel</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-panel" type="color" value="#08080b">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-search">Search Field</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-search" type="color" value="#1c2029">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-btn">Button Fill</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-btn" type="color" value="#222634">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-btn-text">Button Text</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-btn-text" type="color" value="#f6f2e7">
+                    </div>
+                    <div class="worldstage-custom-field">
+                      <label class="worldstage-custom-label" for="worldstage-custom-border">Border</label>
+                      <input class="worldstage-custom-input" id="worldstage-custom-border" type="color" value="#5a657d">
+                    </div>
+                  </div>
+                  <button class="worldstage-custom-reset" id="worldstage-custom-reset" type="button">Reset Customize</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      let shouldSkipIntro = false;
+      try {
+        shouldSkipIntro = window.sessionStorage.getItem('worldstage_skip_intro') === '1';
+      } catch (_) {}
+      window.__worldstageSkipIntro = shouldSkipIntro;
+      if (shouldSkipIntro && document.body) {
+        document.body.classList.add('worldstage-skip-intro');
+      }
+    })();
+  </script>
+  <script type="module" src="/worldstage-space.js?v=20260409f"></script>
+  <script>
+    const worldstageWelcome = document.getElementById('worldstage-welcome');
+    const worldstageOnboarding = document.getElementById('worldstage-onboarding');
+    const worldstageEmailInput = document.getElementById('worldstage-auth-email');
+    const worldstagePasswordInput = document.getElementById('worldstage-auth-password');
+    const worldstagePasswordConfirmInput = document.getElementById('worldstage-auth-password-confirm');
+    const worldstageAuthFields = document.querySelector('.worldstage-auth-fields');
+    const worldstageLoginBtn = document.getElementById('worldstage-auth-login');
+    const worldstageRegisterBtn = document.getElementById('worldstage-auth-register');
+    const worldstageAuthStatus = document.getElementById('worldstage-auth-status');
+    const worldstageFrame = document.querySelector('.worldstage-frame');
+    const worldstageUsernameSetup = document.getElementById('worldstage-username-setup');
+    const worldstageUsernameInput = document.getElementById('worldstage-username-input');
+    const worldstageUsernameSubmit = document.getElementById('worldstage-username-submit');
+    const worldstageUsernameStatus = document.getElementById('worldstage-username-status');
+    const worldstageIdentitySequence = document.getElementById('worldstage-identity-sequence');
+    const worldstageWelcomeUsername = document.getElementById('worldstage-welcome-username');
+    const worldstageTopbar = document.getElementById('worldstage-topbar');
+    const worldstageTopbarUsername = document.getElementById('worldstage-topbar-username');
+    const worldstageMyAccountBtn = document.getElementById('worldstage-my-account');
+    const worldstageSearchInput = document.getElementById('worldstage-search-input');
+    const worldstageSearchGo = document.getElementById('worldstage-search-go');
+    const worldstageSearchIcon = document.getElementById('worldstage-search-icon');
+    const worldstagePortalBtn = document.getElementById('worldstage-portal');
+    const worldstageAccountView = document.getElementById('worldstage-account-view');
+    const worldstageAccountTitle = document.getElementById('worldstage-account-title');
+    const worldstageAccountHostedMenu = document.getElementById('worldstage-account-menu-hosted');
+    const worldstageAccountHostedTrigger = document.getElementById('worldstage-account-menu-hosted-trigger');
+    const worldstageAccountHostedStatus = document.getElementById('worldstage-account-hosted-status');
+    const worldstageAccountHostedList = document.getElementById('worldstage-account-hosted-list');
+    const worldstageAccountWalletMenu = document.getElementById('worldstage-account-menu-wallet');
+    const worldstageAccountWalletTrigger = document.getElementById('worldstage-account-menu-wallet-trigger');
+    const worldstageAccountCustomizeMenu = document.getElementById('worldstage-account-menu-customize');
+    const worldstageAccountCustomizeTrigger = document.getElementById('worldstage-account-menu-customize-trigger');
+    const worldstageCustomPreset = document.getElementById('worldstage-custom-preset');
+    const worldstageCustomFont = document.getElementById('worldstage-custom-font');
+    const worldstageCustomScale = document.getElementById('worldstage-custom-scale');
+    const worldstageCustomSpacing = document.getElementById('worldstage-custom-spacing');
+    const worldstageCustomPageBg = document.getElementById('worldstage-custom-page-bg');
+    const worldstageCustomFrameBg = document.getElementById('worldstage-custom-frame-bg');
+    const worldstageCustomTextMain = document.getElementById('worldstage-custom-text-main');
+    const worldstageCustomAccent = document.getElementById('worldstage-custom-accent');
+    const worldstageCustomSurface = document.getElementById('worldstage-custom-surface');
+    const worldstageCustomPanel = document.getElementById('worldstage-custom-panel');
+    const worldstageCustomSearch = document.getElementById('worldstage-custom-search');
+    const worldstageCustomBtn = document.getElementById('worldstage-custom-btn');
+    const worldstageCustomBtnText = document.getElementById('worldstage-custom-btn-text');
+    const worldstageCustomBorder = document.getElementById('worldstage-custom-border');
+    const worldstageCustomReset = document.getElementById('worldstage-custom-reset');
+    let worldstageMyAccountGhost = null;
+    const worldstageNextPath = (() => {
+      try {
+        const url = new URL(window.location.href);
+        const next = String(url.searchParams.get('next') || '').trim();
+        if (next && next.startsWith('/worldstage')) return next;
+      } catch (_) {}
+      return '/worldstage';
+    })();
+
+    let worldstageIdentityStarted = false;
+    const WORLDSTAGE_CUSTOMIZE_STORAGE_KEY = 'worldstage_customize_v1';
+    const worldstageCustomizeDefaults = {
+      font: 'Orbitron',
+      scale: 100,
+      spacing: 6,
+      pageBg: '#06070b',
+      frameBg: '#000000',
+      textMain: '#f6f2e7',
+      accent: '#c8a46e',
+      surface: '#090a0f',
+      panel: '#08080b',
+      search: '#1c2029',
+      btn: '#222634',
+      btnText: '#f6f2e7',
+      border: '#5a657d'
+    };
+    const worldstageCustomizePresets = {
+      midnight: { ...worldstageCustomizeDefaults },
+      aurora: { ...worldstageCustomizeDefaults, accent: '#59d7ff', textMain: '#e7fbff', surface: '#081823', panel: '#0c202d', search: '#132a3c', btn: '#163348', border: '#5db3d8', pageBg: '#040b12' },
+      ember: { ...worldstageCustomizeDefaults, accent: '#ff8c52', textMain: '#fff2ea', surface: '#21130f', panel: '#251711', search: '#322017', btn: '#41291f', border: '#bd7956', pageBg: '#0e0705' },
+      mint: { ...worldstageCustomizeDefaults, accent: '#61ffcc', textMain: '#eafff8', surface: '#061813', panel: '#0a2019', search: '#103028', btn: '#143a30', border: '#5abda0', pageBg: '#020b08' },
+      royal: { ...worldstageCustomizeDefaults, accent: '#6c8dff', textMain: '#eef2ff', surface: '#0c1026', panel: '#121736', search: '#1a2250', btn: '#202b5c', border: '#6980ca', pageBg: '#060812' },
+      rose: { ...worldstageCustomizeDefaults, accent: '#ff87c1', textMain: '#fff0f7', surface: '#24101b', panel: '#2d1521', search: '#3b1d2d', btn: '#4a2438', border: '#be6e95', pageBg: '#120812' },
+      mono: { ...worldstageCustomizeDefaults, accent: '#d6d6d6', textMain: '#f1f1f1', surface: '#0f0f10', panel: '#151517', search: '#1d1d21', btn: '#2b2b30', border: '#80808a', pageBg: '#070707' },
+      retro: { ...worldstageCustomizeDefaults, font: 'Rajdhani', accent: '#00ff7f', textMain: '#dbffe5', surface: '#04150b', panel: '#082012', search: '#0d2a18', btn: '#12331f', border: '#3f8f66', pageBg: '#010a05' }
+    };
+
+    function worldstageHexToRgba(hex, alpha) {
+      const value = String(hex || '').trim();
+      const safe = /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#000000';
+      const r = Number.parseInt(safe.slice(1, 3), 16);
+      const g = Number.parseInt(safe.slice(3, 5), 16);
+      const b = Number.parseInt(safe.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+
+    function worldstageReadCustomizeInputs() {
+      return {
+        font: String(worldstageCustomFont && worldstageCustomFont.value ? worldstageCustomFont.value : worldstageCustomizeDefaults.font),
+        scale: Number.parseInt(worldstageCustomScale && worldstageCustomScale.value ? worldstageCustomScale.value : String(worldstageCustomizeDefaults.scale), 10) || worldstageCustomizeDefaults.scale,
+        spacing: Number.parseInt(worldstageCustomSpacing && worldstageCustomSpacing.value ? worldstageCustomSpacing.value : String(worldstageCustomizeDefaults.spacing), 10) || worldstageCustomizeDefaults.spacing,
+        pageBg: String(worldstageCustomPageBg && worldstageCustomPageBg.value ? worldstageCustomPageBg.value : worldstageCustomizeDefaults.pageBg),
+        frameBg: String(worldstageCustomFrameBg && worldstageCustomFrameBg.value ? worldstageCustomFrameBg.value : worldstageCustomizeDefaults.frameBg),
+        textMain: String(worldstageCustomTextMain && worldstageCustomTextMain.value ? worldstageCustomTextMain.value : worldstageCustomizeDefaults.textMain),
+        accent: String(worldstageCustomAccent && worldstageCustomAccent.value ? worldstageCustomAccent.value : worldstageCustomizeDefaults.accent),
+        surface: String(worldstageCustomSurface && worldstageCustomSurface.value ? worldstageCustomSurface.value : worldstageCustomizeDefaults.surface),
+        panel: String(worldstageCustomPanel && worldstageCustomPanel.value ? worldstageCustomPanel.value : worldstageCustomizeDefaults.panel),
+        search: String(worldstageCustomSearch && worldstageCustomSearch.value ? worldstageCustomSearch.value : worldstageCustomizeDefaults.search),
+        btn: String(worldstageCustomBtn && worldstageCustomBtn.value ? worldstageCustomBtn.value : worldstageCustomizeDefaults.btn),
+        btnText: String(worldstageCustomBtnText && worldstageCustomBtnText.value ? worldstageCustomBtnText.value : worldstageCustomizeDefaults.btnText),
+        border: String(worldstageCustomBorder && worldstageCustomBorder.value ? worldstageCustomBorder.value : worldstageCustomizeDefaults.border)
+      };
+    }
+
+    function worldstageApplyCustomize(values) {
+      if (!values || !document || !document.documentElement) return;
+      const root = document.documentElement.style;
+      const fontFamily = values.font === 'System UI' ? 'system-ui' : `'${values.font}', sans-serif`;
+      root.setProperty('--ws-font-main', fontFamily);
+      root.setProperty('--ws-page-bg', values.pageBg);
+      root.setProperty('--ws-frame-bg', values.frameBg);
+      root.setProperty('--ws-surface-bg', worldstageHexToRgba(values.surface, 0.88));
+      root.setProperty('--ws-panel-bg', worldstageHexToRgba(values.panel, 0.76));
+      root.setProperty('--ws-search-bg', worldstageHexToRgba(values.search, 0.66));
+      root.setProperty('--ws-text-main', values.textMain);
+      root.setProperty('--ws-text-muted', worldstageHexToRgba(values.textMain, 0.78));
+      root.setProperty('--ws-accent', values.accent);
+      root.setProperty('--ws-btn-bg', worldstageHexToRgba(values.btn, 0.72));
+      root.setProperty('--ws-btn-text', values.btnText);
+      root.setProperty('--ws-border', worldstageHexToRgba(values.border, 0.62));
+      root.setProperty('--ws-font-scale', String(Math.max(0.85, Math.min(1.35, Number(values.scale || 100) / 100))));
+      root.setProperty('--ws-letter-spacing', `${Math.max(2, Math.min(18, Number(values.spacing || 6))) / 100}em`);
+    }
+
+    function worldstageSyncCustomizeInputs(values) {
+      if (!values) return;
+      if (worldstageCustomFont) worldstageCustomFont.value = values.font;
+      if (worldstageCustomScale) worldstageCustomScale.value = String(values.scale);
+      if (worldstageCustomSpacing) worldstageCustomSpacing.value = String(values.spacing);
+      if (worldstageCustomPageBg) worldstageCustomPageBg.value = values.pageBg;
+      if (worldstageCustomFrameBg) worldstageCustomFrameBg.value = values.frameBg;
+      if (worldstageCustomTextMain) worldstageCustomTextMain.value = values.textMain;
+      if (worldstageCustomAccent) worldstageCustomAccent.value = values.accent;
+      if (worldstageCustomSurface) worldstageCustomSurface.value = values.surface;
+      if (worldstageCustomPanel) worldstageCustomPanel.value = values.panel;
+      if (worldstageCustomSearch) worldstageCustomSearch.value = values.search;
+      if (worldstageCustomBtn) worldstageCustomBtn.value = values.btn;
+      if (worldstageCustomBtnText) worldstageCustomBtnText.value = values.btnText;
+      if (worldstageCustomBorder) worldstageCustomBorder.value = values.border;
+    }
+
+    function worldstageSaveCustomize(values) {
+      try {
+        window.localStorage.setItem(WORLDSTAGE_CUSTOMIZE_STORAGE_KEY, JSON.stringify(values));
+      } catch (_) {}
+    }
+
+    function worldstageLoadCustomize() {
+      let values = { ...worldstageCustomizeDefaults };
+      try {
+        const raw = window.localStorage.getItem(WORLDSTAGE_CUSTOMIZE_STORAGE_KEY);
+        if (raw) values = { ...values, ...JSON.parse(raw) };
+      } catch (_) {}
+      worldstageSyncCustomizeInputs(values);
+      worldstageApplyCustomize(values);
+    }
+
+    function worldstageAccountHasUsername(account) {
+      const name = String(account && account.name ? account.name : '').trim();
+      if (!name) return false;
+      // Default account names are email-style; only prompt when still default.
+      return !name.includes('@');
+    }
+
+    function worldstageShowUsernameSetup() {
+      if (!worldstageUsernameSetup) return;
+      worldstageUsernameSetup.classList.add('show');
+      worldstageUsernameSetup.setAttribute('aria-hidden', 'false');
+      if (worldstageUsernameInput) {
+        worldstageUsernameInput.value = String(window.localStorage.getItem('worldstage_username') || '').trim();
+        worldstageUsernameInput.focus();
+      }
+    }
+
+    function worldstageResolveUsername(account) {
+      const accountName = String(account && account.name ? account.name : '').trim();
+      if (accountName && !accountName.includes('@')) return accountName;
+      const cached = String(window.localStorage.getItem('worldstage_username') || '').trim();
+      if (cached && !cached.includes('@')) return cached;
+      return '';
+    }
+
+    function worldstageForgetLegacyAuthArtifacts() {
+      try {
+        window.localStorage.removeItem('worldstage_auth_token');
+        window.localStorage.removeItem('worldstage_account_id');
+      } catch (_) {}
+    }
+
+    function worldstageReadCookie(name) {
+      const prefix = `${String(name || '').trim()}=`;
+      const raw = String(document.cookie || '').split(';');
+      for (const part of raw) {
+        const trimmed = part.trim();
+        if (!trimmed.startsWith(prefix)) continue;
+        try {
+          return decodeURIComponent(trimmed.slice(prefix.length));
+        } catch (_) {
+          return trimmed.slice(prefix.length);
+        }
+      }
+      return '';
+    }
+
+    function worldstageCsrfHeaders(method, headers) {
+      const nextHeaders = Object.assign({}, headers || {});
+      const verb = String(method || 'GET').toUpperCase();
+      if (verb === 'GET' || verb === 'HEAD') return nextHeaders;
+      const csrfToken = worldstageReadCookie('worldstage_csrf_token');
+      if (csrfToken) nextHeaders['X-WorldStage-CSRF'] = csrfToken;
+      return nextHeaders;
+    }
+
+    function worldstageRequestLogout() {
+      fetch('/api/worldstage/auth/logout', {
+        method: 'POST',
+        headers: worldstageCsrfHeaders('POST'),
+        credentials: 'same-origin',
+        keepalive: true
+      }).catch(() => {});
+    }
+
+    function worldstageClearStoredSession() {
+      worldstageForgetLegacyAuthArtifacts();
+      worldstageRequestLogout();
+      worldstageSetSkipIntroOnNextLoad(false);
+    }
+
+    async function worldstageFetchJson(pathname, options) {
+      const requestOptions = Object.assign({
+        credentials: 'same-origin'
+      }, options || {});
+      requestOptions.method = String(requestOptions.method || 'GET').toUpperCase();
+      requestOptions.headers = worldstageCsrfHeaders(requestOptions.method, requestOptions.headers);
+      const response = await fetch(pathname, requestOptions);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const error = new Error(payload && payload.error ? String(payload.error) : `request_failed_${response.status}`);
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+      }
+      return payload;
+    }
+
+    function worldstageSetSkipIntroOnNextLoad(enabled) {
+      try {
+        if (enabled) {
+          window.sessionStorage.setItem('worldstage_skip_intro', '1');
+        } else {
+          window.sessionStorage.removeItem('worldstage_skip_intro');
+        }
+      } catch (_) {}
+      window.__worldstageSkipIntro = Boolean(enabled);
+    }
+
+    function worldstageStartIdentitySequence(username) {
+      const value = String(username || '').trim();
+      if (!value || !worldstageIdentitySequence || worldstageIdentityStarted) return;
+      worldstageIdentityStarted = true;
+      if (worldstageWelcomeUsername) worldstageWelcomeUsername.textContent = value;
+      if (worldstageTopbarUsername) worldstageTopbarUsername.textContent = value;
+      worldstageIdentitySequence.setAttribute('aria-hidden', 'false');
+      worldstageIdentitySequence.classList.add('show');
+      window.setTimeout(() => {
+        if (worldstageIdentitySequence) worldstageIdentitySequence.classList.add('complete');
+        if (worldstageTopbar) worldstageTopbar.setAttribute('aria-hidden', 'false');
+        if (document.body) document.body.classList.add('worldstage-main-ready');
+      }, 2300);
+    }
+
+    function worldstageOpenMyAccount() {
+      const username = String((worldstageTopbarUsername && worldstageTopbarUsername.textContent) || '').trim() || 'User';
+      if (worldstageAccountTitle) worldstageAccountTitle.textContent = `${username}'s Account`;
+      if (worldstageAccountView) {
+        worldstageAccountView.classList.remove('show');
+        worldstageAccountView.style.opacity = '0';
+        worldstageAccountView.style.pointerEvents = 'none';
+      }
+      if (worldstageMyAccountBtn && document.body) {
+        const rect = worldstageMyAccountBtn.getBoundingClientRect();
+        if (worldstageMyAccountGhost && worldstageMyAccountGhost.parentNode) {
+          worldstageMyAccountGhost.parentNode.removeChild(worldstageMyAccountGhost);
+        }
+        worldstageMyAccountGhost = document.createElement('div');
+        worldstageMyAccountGhost.className = 'worldstage-my-account-ghost';
+        worldstageMyAccountGhost.textContent = worldstageMyAccountBtn.textContent || 'My Account';
+        worldstageMyAccountGhost.style.left = `${rect.left}px`;
+        worldstageMyAccountGhost.style.top = `${rect.top}px`;
+        worldstageMyAccountGhost.style.width = `${rect.width}px`;
+        worldstageMyAccountGhost.style.height = `${rect.height}px`;
+        document.body.appendChild(worldstageMyAccountGhost);
+      }
+      if (worldstageTopbar) {
+        worldstageTopbar.setAttribute('aria-hidden', 'true');
+        worldstageTopbar.style.pointerEvents = 'none';
+      }
+      if (worldstageAccountView) {
+        worldstageAccountView.setAttribute('aria-hidden', 'false');
+        worldstageAccountView.style.pointerEvents = 'auto';
+      }
+      if (document.body) document.body.classList.add('worldstage-my-account-transition');
+      void worldstageLoadHostedVideos();
+      window.setTimeout(() => {
+        if (worldstageMyAccountGhost && worldstageMyAccountGhost.parentNode) {
+          worldstageMyAccountGhost.parentNode.removeChild(worldstageMyAccountGhost);
+          worldstageMyAccountGhost = null;
+        }
+      }, 3000);
+    }
+
+    function worldstageSetAccountMenuState(menu, trigger, open) {
+      if (!menu || !trigger) return;
+      const next = Boolean(open);
+      menu.setAttribute('data-open', next ? 'true' : 'false');
+      trigger.setAttribute('aria-expanded', next ? 'true' : 'false');
+    }
+
+    function worldstageRenderHostedVideos(items) {
+      if (!worldstageAccountHostedList) return;
+      worldstageAccountHostedList.innerHTML = '';
+      if (!Array.isArray(items) || items.length === 0) {
+        const row = document.createElement('li');
+        row.className = 'worldstage-account-hosted-item worldstage-account-hosted-empty';
+        row.textContent = 'No hosted videos yet. Download a video and it will appear here.';
+        worldstageAccountHostedList.appendChild(row);
+        return;
+      }
+      for (const item of items) {
+        const row = document.createElement('li');
+        row.className = 'worldstage-account-hosted-item';
+        const title = String(item.title || item.videoTitle || item.videoId || 'Hosted Video').trim();
+        const status = String(item.status || '').trim();
+        row.textContent = status ? `${title} • ${status}` : title;
+        worldstageAccountHostedList.appendChild(row);
+      }
+    }
+
+    async function worldstageLoadHostedVideos() {
+      if (worldstageAccountHostedStatus) worldstageAccountHostedStatus.textContent = 'Loading hosted videos…';
+      try {
+        const payload = await worldstageFetchJson('/api/worldstage/downloads', {
+          method: 'GET',
+          cache: 'no-store'
+        });
+        const downloads = Array.isArray(payload && payload.downloads) ? payload.downloads : [];
+        const hosted = downloads.filter((item) => {
+          const status = String(item && item.status ? item.status : '').toLowerCase();
+          return status === 'completed' || status === 'downloading' || status === 'queued' || status === '';
+        });
+        if (worldstageAccountHostedStatus) {
+          worldstageAccountHostedStatus.textContent = hosted.length
+            ? `Showing ${hosted.length} hosted video${hosted.length === 1 ? '' : 's'}.`
+            : 'No hosted videos yet.';
+        }
+        worldstageRenderHostedVideos(hosted);
+      } catch (error) {
+        if (worldstageAccountHostedStatus) worldstageAccountHostedStatus.textContent = 'Unable to load hosted videos right now.';
+        worldstageRenderHostedVideos([]);
+      }
+    }
+
+    function worldstageSubmitSearch() {
+      const query = String(worldstageSearchInput && worldstageSearchInput.value ? worldstageSearchInput.value : '').trim();
+      if (!query) return;
+      window.dispatchEvent(new CustomEvent('worldstage-search', { detail: { query } }));
+    }
+
+    async function worldstageSubmitUsername() {
+      const value = worldstageUsernameInput ? String(worldstageUsernameInput.value || '').trim() : '';
+      if (!value) {
+        if (worldstageUsernameStatus) worldstageUsernameStatus.textContent = 'Username is required.';
+        return;
+      }
+
+      if (worldstageUsernameSubmit) worldstageUsernameSubmit.disabled = true;
+      if (worldstageUsernameStatus) worldstageUsernameStatus.textContent = 'Saving username…';
+      try {
+        await worldstageFetchJson('/api/worldstage/me/username', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ username: value })
+        });
+        window.localStorage.setItem('worldstage_username', value);
+        if (worldstageUsernameStatus) worldstageUsernameStatus.textContent = 'Username saved.';
+        window.setTimeout(() => {
+          if (!worldstageUsernameSetup) return;
+          worldstageUsernameSetup.classList.remove('show');
+          worldstageUsernameSetup.setAttribute('aria-hidden', 'true');
+          worldstageStartIdentitySequence(value);
+        }, 500);
+      } catch (error) {
+        if (worldstageUsernameStatus) {
+          worldstageUsernameStatus.textContent = String(error && error.message ? error.message : 'Username save failed.');
+        }
+      } finally {
+        if (worldstageUsernameSubmit) worldstageUsernameSubmit.disabled = false;
+      }
+    }
+
+    function worldstageSetAuthStatus(message, tone) {
+      if (!worldstageAuthStatus) return;
+      worldstageAuthStatus.textContent = String(message || '');
+      worldstageAuthStatus.classList.remove('error', 'ok');
+      if (tone === 'error' || tone === 'ok') worldstageAuthStatus.classList.add(tone);
+    }
+
+    function worldstageSetAuthBusy(busy) {
+      const disabled = Boolean(busy);
+      if (worldstageLoginBtn) worldstageLoginBtn.disabled = disabled;
+      if (worldstageRegisterBtn) worldstageRegisterBtn.disabled = disabled;
+      if (worldstageEmailInput) worldstageEmailInput.disabled = disabled;
+      if (worldstagePasswordInput) worldstagePasswordInput.disabled = disabled;
+      if (worldstagePasswordConfirmInput) worldstagePasswordConfirmInput.disabled = disabled;
+    }
+
+    async function worldstageFetchAuthenticatedAccount() {
+      const payload = await worldstageFetchJson('/api/worldstage/me', {
+        method: 'GET',
+        cache: 'no-store'
+      });
+      return payload && payload.account ? payload.account : null;
+    }
+
+    function worldstageEnterAuthenticatedUi(account) {
+      if (worldstageOnboarding) {
+        worldstageOnboarding.classList.remove('show');
+        worldstageOnboarding.classList.add('hide');
+        worldstageOnboarding.style.opacity = '0';
+        worldstageOnboarding.style.pointerEvents = 'none';
+        worldstageOnboarding.setAttribute('aria-hidden', 'true');
+      }
+      if (worldstageWelcome) worldstageWelcome.classList.remove('show');
+      if (worldstageFrame) {
+        worldstageFrame.classList.add('authenticated');
+        worldstageFrame.classList.add('lights-on');
+      }
+      if (document.body) {
+        document.body.classList.add('worldstage-post-auth');
+        document.body.classList.add('worldstage-main-ready');
+      }
+      if (worldstageTopbar) worldstageTopbar.setAttribute('aria-hidden', 'false');
+      const username = worldstageResolveUsername(account);
+      if (username) {
+        worldstageIdentityStarted = true;
+        if (worldstageWelcomeUsername) worldstageWelcomeUsername.textContent = username;
+        if (worldstageTopbarUsername) worldstageTopbarUsername.textContent = username;
+        if (worldstageIdentitySequence) {
+          worldstageIdentitySequence.classList.remove('show', 'complete');
+          worldstageIdentitySequence.setAttribute('aria-hidden', 'true');
+        }
+      } else {
+        worldstageShowUsernameSetup();
+      }
+    }
+
+    async function worldstageResumeAuthenticatedSession() {
+      try {
+        const account = await worldstageFetchAuthenticatedAccount();
+        worldstageForgetLegacyAuthArtifacts();
+        if (account && account.id) window.localStorage.setItem('worldstage_account_id', String(account.id));
+        if (account && worldstageAccountHasUsername(account)) {
+          window.localStorage.setItem('worldstage_username', String(account.name || '').trim());
+        }
+        worldstageSetSkipIntroOnNextLoad(false);
+        worldstageEnterAuthenticatedUi(account);
+        return true;
+      } catch (error) {
+        worldstageForgetLegacyAuthArtifacts();
+        if (error && error.status === 401) worldstageRequestLogout();
+        return false;
+      }
+    }
+
+    function worldstageHandleAuthSuccess(mode, account) {
+      if (mode === 'register') {
+        worldstageSetAuthStatus('Account created. You are authenticated.', 'ok');
+      } else {
+        worldstageSetAuthStatus('', '');
+      }
+      if (worldstageOnboarding) {
+        const currentOpacity = window.getComputedStyle(worldstageOnboarding).opacity || '1';
+        worldstageOnboarding.classList.remove('show');
+        worldstageOnboarding.classList.remove('hide');
+        worldstageOnboarding.style.transition = 'opacity 900ms ease';
+        worldstageOnboarding.style.opacity = currentOpacity;
+        worldstageOnboarding.style.pointerEvents = 'none';
+        worldstageOnboarding.setAttribute('aria-hidden', 'false');
+        window.requestAnimationFrame(() => {
+          worldstageOnboarding.style.opacity = '0';
+        });
+      }
+      // Wait for the full onboarding fade duration before starting post-auth zoom.
+      window.setTimeout(() => {
+        if (worldstageOnboarding) {
+          worldstageOnboarding.classList.add('hide');
+          worldstageOnboarding.setAttribute('aria-hidden', 'true');
+        }
+      }, 900);
+
+      window.setTimeout(() => {
+        if (document.body) document.body.classList.add('worldstage-post-auth');
+        window.setTimeout(() => {
+          if (worldstageFrame) worldstageFrame.classList.add('authenticated');
+        }, 900);
+        window.setTimeout(() => {
+          const username = worldstageResolveUsername(account);
+          if (username) {
+            worldstageStartIdentitySequence(username);
+            return;
+          }
+          worldstageShowUsernameSetup();
+        }, 3700);
+      }, 900);
+    }
+
+    async function worldstageAuthRequest(pathname, mode) {
+      const email = worldstageEmailInput ? String(worldstageEmailInput.value || '').trim() : '';
+      const password = worldstagePasswordInput ? String(worldstagePasswordInput.value || '') : '';
+      const passwordConfirm = worldstagePasswordConfirmInput ? String(worldstagePasswordConfirmInput.value || '') : '';
+      if (!email || !password) {
+        worldstageSetAuthStatus('Email or username and password are required.', 'error');
+        return;
+      }
+      if (mode === 'register') {
+        if (password.length < 8) {
+          worldstageSetAuthStatus('Password must be at least 8 characters.', 'error');
+          return;
+        }
+        if (password !== passwordConfirm) {
+          worldstageSetAuthStatus('Password confirmation does not match.', 'error');
+          return;
+        }
+      }
+      worldstageSetAuthBusy(true);
+      worldstageSetAuthStatus('', '');
+      try {
+        const payload = await worldstageFetchJson(pathname, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, username: email, password })
+        });
+        worldstageForgetLegacyAuthArtifacts();
+        if (payload && payload.account && payload.account.id) window.localStorage.setItem('worldstage_account_id', String(payload.account.id));
+        if (payload && payload.account && worldstageAccountHasUsername(payload.account)) {
+          window.localStorage.setItem('worldstage_username', String(payload.account.name || '').trim());
+        }
+        worldstageHandleAuthSuccess(mode, payload && payload.account ? payload.account : null);
+        worldstageSetSkipIntroOnNextLoad(true);
+        window.setTimeout(() => {
+          if (worldstageNextPath === '/worldstage') {
+            try {
+              window.history.replaceState(null, '', worldstageNextPath);
+            } catch (_) {}
+            worldstageSetSkipIntroOnNextLoad(false);
+            return;
+          }
+          window.location.assign(worldstageNextPath);
+        }, 5200);
+      } catch (error) {
+        let errorMessage = String(error && error.message ? error.message : 'request_failed');
+        if (error && error.payload && error.payload.error === 'likely_email_typo' && error.payload.suggestedEmail) {
+          errorMessage = `Email looks mistyped. Did you mean ${String(error.payload.suggestedEmail)}?`;
+        }
+        worldstageSetAuthStatus(errorMessage, 'error');
+      } finally {
+        worldstageSetAuthBusy(false);
+      }
+    }
+
+    if (worldstageRegisterBtn) {
+      worldstageRegisterBtn.addEventListener('click', () => {
+        const inRegisterMode = Boolean(worldstageAuthFields && worldstageAuthFields.classList.contains('register-mode'));
+        if (!inRegisterMode) {
+          if (worldstageAuthFields) worldstageAuthFields.classList.add('register-mode');
+          worldstageSetAuthStatus('', '');
+          if (worldstagePasswordConfirmInput) worldstagePasswordConfirmInput.focus();
+          return;
+        }
+        worldstageAuthRequest('/api/worldstage/auth/register', 'register');
+      });
+    }
+
+    if (worldstageLoginBtn) {
+      worldstageLoginBtn.addEventListener('click', () => {
+        if (worldstageAuthFields) worldstageAuthFields.classList.remove('register-mode');
+        worldstageAuthRequest('/api/worldstage/auth/login', 'login');
+      });
+    }
+
+    if (worldstagePasswordInput) {
+      worldstagePasswordInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        worldstageAuthRequest('/api/worldstage/auth/login', 'login');
+      });
+    }
+
+    if (worldstageOnboarding) {
+      window.addEventListener('worldstage-approach-complete', () => {
+        if (window.__worldstageSkipIntro) return;
+        // Skip the welcome-title phase entirely and reveal onboarding directly.
+        if (worldstageWelcome) worldstageWelcome.classList.remove('show');
+        if (worldstageFrame) worldstageFrame.classList.add('lights-on');
+        worldstageOnboarding.classList.remove('show');
+        void worldstageOnboarding.offsetWidth;
+        worldstageOnboarding.classList.add('show');
+      }, { once: true });
+    }
+
+    if (worldstageUsernameSubmit) {
+      worldstageUsernameSubmit.addEventListener('click', () => {
+        void worldstageSubmitUsername();
+      });
+    }
+
+    if (worldstageUsernameInput) {
+      worldstageUsernameInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        void worldstageSubmitUsername();
+      });
+    }
+
+    if (worldstageSearchGo) {
+      worldstageSearchGo.addEventListener('click', () => {
+        worldstageSubmitSearch();
+      });
+    }
+
+    if (worldstageSearchIcon) {
+      worldstageSearchIcon.addEventListener('click', () => {
+        worldstageSubmitSearch();
+      });
+    }
+
+    if (worldstageSearchInput) {
+      worldstageSearchInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        worldstageSubmitSearch();
+      });
+    }
+
+    if (worldstagePortalBtn) {
+      worldstagePortalBtn.addEventListener('click', () => {
+        window.location.href = 'https://5310s.com';
+      });
+    }
+
+    if (worldstageMyAccountBtn) {
+      worldstageMyAccountBtn.addEventListener('click', () => {
+        worldstageOpenMyAccount();
+      });
+    }
+
+    if (worldstageAccountHostedTrigger) {
+      worldstageAccountHostedTrigger.addEventListener('click', () => {
+        const open = worldstageAccountHostedMenu && worldstageAccountHostedMenu.getAttribute('data-open') === 'true';
+        worldstageSetAccountMenuState(worldstageAccountHostedMenu, worldstageAccountHostedTrigger, !open);
+      });
+    }
+
+    if (worldstageAccountWalletTrigger) {
+      worldstageAccountWalletTrigger.addEventListener('click', () => {
+        const open = worldstageAccountWalletMenu && worldstageAccountWalletMenu.getAttribute('data-open') === 'true';
+        worldstageSetAccountMenuState(worldstageAccountWalletMenu, worldstageAccountWalletTrigger, !open);
+      });
+    }
+
+    function worldstageHandleCustomizeInput() {
+      const values = worldstageReadCustomizeInputs();
+      worldstageApplyCustomize(values);
+      worldstageSaveCustomize(values);
+      if (worldstageCustomPreset) worldstageCustomPreset.value = '';
+    }
+
+    const worldstageCustomizeInputs = [
+      worldstageCustomFont,
+      worldstageCustomScale,
+      worldstageCustomSpacing,
+      worldstageCustomPageBg,
+      worldstageCustomFrameBg,
+      worldstageCustomTextMain,
+      worldstageCustomAccent,
+      worldstageCustomSurface,
+      worldstageCustomPanel,
+      worldstageCustomSearch,
+      worldstageCustomBtn,
+      worldstageCustomBtnText,
+      worldstageCustomBorder
+    ];
+
+    for (const control of worldstageCustomizeInputs) {
+      if (!control) continue;
+      control.addEventListener('input', worldstageHandleCustomizeInput);
+      control.addEventListener('change', worldstageHandleCustomizeInput);
+    }
+
+    if (worldstageCustomPreset) {
+      worldstageCustomPreset.addEventListener('change', () => {
+        const key = String(worldstageCustomPreset.value || '').trim();
+        if (!key || !worldstageCustomizePresets[key]) return;
+        const values = { ...worldstageCustomizePresets[key] };
+        worldstageSyncCustomizeInputs(values);
+        worldstageApplyCustomize(values);
+        worldstageSaveCustomize(values);
+      });
+    }
+
+    if (worldstageCustomReset) {
+      worldstageCustomReset.addEventListener('click', () => {
+        const values = { ...worldstageCustomizeDefaults };
+        if (worldstageCustomPreset) worldstageCustomPreset.value = '';
+        worldstageSyncCustomizeInputs(values);
+        worldstageApplyCustomize(values);
+        worldstageSaveCustomize(values);
+      });
+    }
+
+    if (worldstageAccountCustomizeTrigger) {
+      worldstageAccountCustomizeTrigger.addEventListener('click', () => {
+        const open = worldstageAccountCustomizeMenu && worldstageAccountCustomizeMenu.getAttribute('data-open') === 'true';
+        worldstageSetAccountMenuState(worldstageAccountCustomizeMenu, worldstageAccountCustomizeTrigger, !open);
+      });
+    }
+
+    worldstageLoadCustomize();
+    void worldstageResumeAuthenticatedSession();
+  </script>
+</body>
+</html>

@@ -15,6 +15,7 @@ const { autoUpdater } = require('electron-updater');
 const { WorldStageClientAgent } = require('../lib/client-agent');
 const { WorldStageAppUpdater } = require('../lib/app-updater');
 const { syncLaunchOnLogin } = require('../lib/launch-on-login');
+const { WorldStageLocalServer } = require('../lib/worldstage-local-server');
 const {
   extractPairingLinkFromArgv,
   PAIRING_PROTOCOL
@@ -34,6 +35,8 @@ let worldstageSiteWindow = null;
 let tray = null;
 let agent = null;
 let updater = null;
+let worldstageLocalServer = null;
+let worldstageLocalServerStartPromise = null;
 let isQuitting = false;
 const pendingPairingLinks = [];
 const transportHostState = {
@@ -180,9 +183,14 @@ function syncWorldStageSiteState(patch = {}) {
 }
 
 function currentWorldStageSiteOrigin() {
-  return agent && agent.config && agent.config.siteOrigin
-    ? agent.config.siteOrigin
-    : 'https://5310s.com';
+  if (worldstageLocalServer) {
+    const baseUrl = String(worldstageLocalServer.getBaseUrl() || '').trim();
+    if (baseUrl) return baseUrl;
+  }
+  if (agent && agent.config && agent.config.siteOrigin) {
+    return String(agent.config.siteOrigin || '').trim() || 'https://5310s.com';
+  }
+  return 'https://5310s.com';
 }
 
 function currentWorldStageSiteUrl(pathname = '/worldstage') {
@@ -191,6 +199,69 @@ function currentWorldStageSiteUrl(pathname = '/worldstage') {
 
 function allowWorldStageNavigation(targetUrl) {
   return isWorldStageSiteUrlAllowed(currentWorldStageSiteOrigin(), targetUrl);
+}
+
+function syncAgentAccountToken(token) {
+  if (!agent) return false;
+  const nextToken = String(token || '').trim();
+  if (agent.config.accountToken === nextToken) return false;
+  agent.saveConfig({
+    accountToken: nextToken
+  });
+  return true;
+}
+
+async function ensureWorldStageLocalServerStarted() {
+  if (worldstageLocalServer) return worldstageLocalServer.getBaseUrl();
+  if (worldstageLocalServerStartPromise) return worldstageLocalServerStartPromise;
+  if (!agent) return '';
+
+  const paths = ensureDirectories();
+  const nextServer = new WorldStageLocalServer({
+    assetsDirectory: path.join(__dirname, 'worldstage'),
+    sessionStatePath: path.join(paths.userDataPath, 'worldstage-browser-sessions.json'),
+    getSiteOrigin: () => agent && agent.config ? agent.config.siteOrigin : 'https://5310s.com',
+    getDesktopAuthToken: () => agent && agent.config ? agent.config.accountToken : '',
+    onAuthToken: ({ authToken }) => {
+      syncAgentAccountToken(authToken);
+    },
+    onClearAuthToken: () => {
+      syncAgentAccountToken('');
+    }
+  });
+
+  worldstageLocalServerStartPromise = nextServer.start()
+    .then((baseUrl) => {
+      worldstageLocalServer = nextServer;
+      syncWorldStageSiteState({
+        lastError: ''
+      });
+      if (agent) pushSnapshot();
+      return baseUrl;
+    })
+    .catch((error) => {
+      syncWorldStageSiteState({
+        lastError: `worldstage_local_server_start_failed: ${String(error && error.message ? error.message : error)}`
+      });
+      if (agent) pushSnapshot();
+      console.error('worldstage local server failed to start', error);
+      return '';
+    })
+    .finally(() => {
+      worldstageLocalServerStartPromise = null;
+    });
+
+  return worldstageLocalServerStartPromise;
+}
+
+async function stopWorldStageLocalServer() {
+  if (worldstageLocalServerStartPromise) {
+    await worldstageLocalServerStartPromise.catch(() => '');
+  }
+  const server = worldstageLocalServer;
+  worldstageLocalServer = null;
+  if (!server) return;
+  await server.stop().catch(() => {});
 }
 
 function updateWorldStageLocation(urlValue) {
@@ -272,6 +343,7 @@ function attachWorldStageWindowHandlers(window) {
 }
 
 async function openWorldStageWindow(options = {}) {
+  await ensureWorldStageLocalServerStarted();
   const targetUrl = String(options.targetUrl || currentWorldStageSiteUrl()).trim() || currentWorldStageSiteUrl();
   const openedAtIso = nowIso();
 
@@ -324,6 +396,7 @@ async function openWorldStageWindow(options = {}) {
 }
 
 async function reloadWorldStageWindow() {
+  await ensureWorldStageLocalServerStarted();
   if (!worldstageSiteWindow || worldstageSiteWindow.isDestroyed()) {
     return openWorldStageWindow({
       forceReload: true
@@ -819,6 +892,7 @@ app.whenReady().then(async () => {
     refreshTrayMenu();
     pushSnapshot(snapshot);
   });
+  await ensureWorldStageLocalServerStarted();
 
   createMainWindow();
   createTransportWindow();
@@ -877,6 +951,7 @@ app.on('before-quit', async (event) => {
   isQuitting = true;
   event.preventDefault();
   if (updater) updater.destroy();
+  await stopWorldStageLocalServer();
   await agent.destroy();
   app.quit();
 });
