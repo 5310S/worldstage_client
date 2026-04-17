@@ -12,17 +12,26 @@ async function main() {
   assert.match(workflow, /ubuntu-latest/, 'Expected Linux desktop builds in the workflow.');
   assert.match(workflow, /windows-latest/, 'Expected Windows desktop builds in the workflow.');
   assert.match(workflow, /macos-latest/, 'Expected macOS desktop builds in the workflow.');
+  assert.match(workflow, /workflow_dispatch:/, 'Expected the workflow to support manual release backfills.');
+  assert.match(workflow, /publish_release:/, 'Expected manual release publishes to require an explicit opt-in input.');
+  assert.match(workflow, /release_tag:/, 'Expected manual release publishes to accept a target release tag.');
   assert.match(workflow, /contents:\s*write/, 'Expected release workflow permissions to allow publishing GitHub release assets.');
   assert.match(workflow, /npm ci/, 'Expected the workflow to install dependencies reproducibly.');
   assert.match(workflow, /npm test/, 'Expected the workflow to run tests before packaging.');
   assert.match(workflow, /--linux --x64/, 'Expected Linux release builds to emit a stable x64 artifact.');
+  assert.match(workflow, /--linux --arm64/, 'Expected Linux release builds to emit an ARM64 artifact.');
   assert.match(workflow, /--win --x64/, 'Expected Windows release builds to emit a stable x64 artifact.');
-  assert.match(workflow, /--mac --x64/, 'Expected macOS release builds to emit a stable x64 artifact.');
+  assert.match(workflow, /--mac --universal/, 'Expected macOS release builds to emit a universal artifact.');
+  assert.match(workflow, /publish_update_metadata:\s*true/, 'Expected the workflow to mark which builds may publish updater metadata.');
+  assert.match(workflow, /publish_update_metadata:\s*false/, 'Expected Linux ARM64 builds to skip updater metadata publication.');
+  assert.match(workflow, /worldstage-client-\$\{\{\s*matrix\.target\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}/, 'Expected build artifacts to be archived by target and architecture.');
+  assert.match(workflow, /worldstage-client-\$\{\{\s*matrix\.target\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}-metadata/, 'Expected updater metadata artifacts to stay separate from packaged binaries.');
   assert.match(workflow, /npm run desktop:dist -- \$\{\{ matrix\.dist_args \}\}/, 'Expected the workflow to package through the desktop dist wrapper.');
-  assert.match(workflow, /WORLDSTAGE_CLIENT_PUBLISH:\s*always/, 'Expected tagged builds to switch the desktop dist wrapper into GitHub publishing mode.');
-  assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/, 'Expected tagged builds to authenticate GitHub release publishing.');
   assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/, 'Expected the workflow to disable signing autodiscovery on CI by default.');
   assert.match(workflow, /actions\/upload-artifact@v4/, 'Expected the workflow to upload packaged desktop artifacts.');
+  assert.match(workflow, /actions\/download-artifact@v4/, 'Expected release uploads to run after downloading the packaged build artifacts.');
+  assert.match(workflow, /gh release upload/, 'Expected release assets to publish through a single serialized GitHub upload step.');
+  assert.match(workflow, /merge-multiple:\s*true/, 'Expected release uploads to merge the per-platform build artifacts before publishing.');
 
   console.log('worldstage-client-release-workflow.test.js: ok');
 }

@@ -7,22 +7,59 @@ on:
     tags:
       - 'v*'
   pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Desktop platform to build
+        required: true
+        default: mac
+        type: choice
+        options:
+          - mac
+          - windows
+          - linux
+          - all
+      release_tag:
+        description: Existing release tag to upload artifacts to when publishing manually
+        required: false
+        type: string
+      publish_release:
+        description: Upload the generated artifacts to a GitHub release
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == matrix.target }}
+    name: Build ${{ matrix.target }} ${{ matrix.arch }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
+            target: linux
+            arch: x64
             dist_args: --linux --x64
+            publish_update_metadata: true
+          - os: ubuntu-latest
+            target: linux
+            arch: arm64
+            dist_args: --linux --arm64
+            publish_update_metadata: false
           - os: windows-latest
+            target: windows
+            arch: x64
             dist_args: --win --x64
+            publish_update_metadata: true
           - os: macos-latest
-            dist_args: --mac --x64
+            target: mac
+            arch: universal
+            dist_args: --mac --universal
+            publish_update_metadata: true
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -42,27 +79,64 @@ jobs:
         run: npm test
 
       - name: Build desktop package
-        if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         run: npm run desktop:dist -- ${{ matrix.dist_args }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_LINK: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.APPLE_TEAM_ID || '' }}
 
-      - name: Build and publish GitHub release artifacts
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: npm run desktop:dist -- ${{ matrix.dist_args }}
-        env:
-          WORLDSTAGE_CLIENT_PUBLISH: always
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Upload artifacts
+      - name: Upload packaged artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: worldstage-client-${{ matrix.os }}
-          path: release/**
+          name: worldstage-client-${{ matrix.target }}-${{ matrix.arch }}
+          path: release/WorldStageClient-*
           if-no-files-found: error
+
+      - name: Upload updater metadata
+        if: ${{ matrix.publish_update_metadata }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: worldstage-client-${{ matrix.target }}-${{ matrix.arch }}-metadata
+          path: release/latest*.yml
+          if-no-files-found: error
+
+  publish-release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) }}
+    name: Publish GitHub release assets
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download packaged artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: worldstage-client-*
+          merge-multiple: true
+          path: release-upload
+
+      - name: Resolve release tag
+        id: release-tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          release_tag="${{ inputs.release_tag }}"
+          if [[ -z "${release_tag}" ]]; then
+            echo "workflow_dispatch publishes require the release_tag input" >&2
+            exit 1
+          fi
+          echo "value=${release_tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release-tag.outputs.value }}
+        shell: bash
+        run: |
+          gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null
+          gh release upload "${RELEASE_TAG}" release-upload/* --clobber --repo "${GITHUB_REPOSITORY}"

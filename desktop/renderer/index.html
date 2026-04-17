@@ -10,142 +10,117 @@
     <div class="backdrop backdrop-a"></div>
     <div class="backdrop backdrop-b"></div>
     <main class="shell">
+      <section id="auth-shell" class="auth-shell panel">
+        <div class="auth-shell-copy">
+          <p class="eyebrow">WorldStage Desktop</p>
+          <h1 id="auth-title">Sign in to WorldStage</h1>
+          <p id="auth-copy" class="lede">
+            Use your WorldStage account to connect this computer for background downloads and seeding.
+          </p>
+        </div>
+        <div class="auth-mode-switch" role="tablist" aria-label="Account mode">
+          <button id="auth-mode-login" class="auth-mode-button auth-mode-active" type="button">Login</button>
+          <button id="auth-mode-register" class="auth-mode-button" type="button">Register</button>
+        </div>
+        <form id="auth-form" class="auth-form">
+          <label>
+            <span id="auth-identifier-label">Email or username</span>
+            <input id="auth-identifier" name="identifier" type="text" autocomplete="username" placeholder="you@example.com or @handle" />
+          </label>
+          <label>
+            <span>Password</span>
+            <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Password" />
+          </label>
+          <label id="auth-password-confirm-field" hidden>
+            <span>Confirm password</span>
+            <input id="auth-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" placeholder="Confirm password" />
+          </label>
+          <p id="auth-status" class="muted auth-status" aria-live="polite"></p>
+          <button id="auth-submit-button" class="primary" type="submit">Login</button>
+        </form>
+      </section>
+
+      <div id="app-shell" hidden>
       <section class="hero panel">
         <div class="hero-copy">
-          <p class="eyebrow">WorldStage Home Agent</p>
-          <h1>Keep seeding when the browser is gone.</h1>
+          <p class="eyebrow">WorldStage Desktop</p>
+          <h1>Sign in once. This Mac keeps WorldStage alive in the background.</h1>
           <p class="lede">
-            This client is the long-lived desktop side of WorldStage: local files, queued download intents, and the
-            background lifecycle the website can hand work to while the browser is closed.
+            Open WorldStage, sign in to your account, and this app keeps downloads and seeding active after you close
+            the website. If you do not have an account yet, you can create one from the same flow.
           </p>
           <div class="hero-badges">
-            <span id="agent-pill" class="pill pill-neutral">Idle</span>
-            <span id="transport-pill" class="pill pill-warn">Transport Pending</span>
-            <span id="close-pill" class="pill pill-ok">Background Close Enabled</span>
+            <span id="account-pill" class="pill pill-warn">Needs Sign In</span>
+            <span id="device-pill" class="pill pill-neutral">Waiting For Connection</span>
+            <span id="background-pill" class="pill pill-ok">Background Ready</span>
           </div>
         </div>
         <aside class="hero-actions">
-          <button id="apply-home-defaults-button" class="secondary">Use Home Client Defaults</button>
           <button id="open-worldstage-button" class="primary">Open WorldStage</button>
-          <button id="reload-worldstage-button" class="ghost">Reload WorldStage</button>
-          <button id="start-agent-button" class="primary">Start Agent</button>
-          <button id="stop-agent-button" class="secondary">Pause Agent</button>
           <button id="open-downloads-button" class="ghost">Open Downloads</button>
-          <button id="open-data-button" class="ghost">Open App Data</button>
         </aside>
       </section>
 
-      <section class="grid two-up">
+      <section class="grid three-up dashboard-grid">
         <article class="panel">
           <div class="section-head">
-            <p class="eyebrow">Bridge</p>
-            <h2>Website Hand-off</h2>
+            <p class="eyebrow">Account</p>
+            <h2>WorldStage Access</h2>
           </div>
           <dl class="stats">
             <div>
-              <dt>Site origin</dt>
-              <dd id="site-origin-value">Unavailable</dd>
+              <dt>Account</dt>
+              <dd id="account-status-value">Not connected</dd>
             </div>
             <div>
-              <dt>Last cycle</dt>
-              <dd id="last-cycle-value">Never</dd>
+              <dt>This device</dt>
+              <dd id="device-status-value">Waiting for connection</dd>
             </div>
             <div>
-              <dt>Last sync result</dt>
+              <dt>Background mode</dt>
+              <dd id="background-mode-value">Automatic</dd>
+            </div>
+            <div>
+              <dt>Last sync</dt>
               <dd id="last-sync-value">Not started</dd>
             </div>
-            <div>
-              <dt>Transport state</dt>
-              <dd id="transport-state-value">Not connected</dd>
-            </div>
-            <div>
-              <dt>Host runtime</dt>
-              <dd id="transport-host-value">Booting</dd>
-            </div>
-            <div>
-              <dt>Host capability</dt>
-              <dd id="transport-capability-value">WebRTC download + seed transport</dd>
-            </div>
-            <div>
-              <dt>WorldStage window</dt>
-              <dd id="worldstage-window-value">Closed</dd>
-            </div>
-            <div>
-              <dt>WorldStage page</dt>
-              <dd id="worldstage-url-value">Unavailable</dd>
-            </div>
-            <div>
-              <dt>Host result</dt>
-              <dd id="transport-host-result-value">Not started</dd>
-            </div>
-            <div>
-              <dt>Remote status</dt>
-              <dd id="remote-status-value">Not started</dd>
-            </div>
-            <div>
-              <dt>Remote commands</dt>
-              <dd id="remote-command-value">Not started</dd>
-            </div>
-            <div>
-              <dt>Launch on login</dt>
-              <dd id="launch-on-login-value">Not synced</dd>
-            </div>
-            <div>
-              <dt>Remote report</dt>
-              <dd id="remote-report-value">Not started</dd>
-            </div>
           </dl>
-          <p id="transport-note" class="muted">
-            The queue, control plane, and background transfer host are wired. Completed local copies can now answer new download requests in the background.
+          <p id="account-note" class="muted">
+            Open WorldStage to sign in or create an account. The website should pair this app automatically when the hand-off is available.
           </p>
         </article>
 
         <article class="panel">
           <div class="section-head">
-            <p class="eyebrow">Setup</p>
-            <h2>Install Checklist</h2>
-          </div>
-          <div id="setup-checklist" class="setup-checklist"></div>
-          <p class="muted">
-            The fastest install path is: enable home-client defaults once, sign into WorldStage, and leave the app running in the tray.
-          </p>
-        </article>
-
-        <article class="panel">
-          <div class="section-head">
-            <p class="eyebrow">Storage</p>
-            <h2>Local Footprint</h2>
+            <p class="eyebrow">Activity</p>
+            <h2>Downloads And Seeding</h2>
           </div>
           <dl class="stats">
             <div>
-              <dt>Queued jobs</dt>
-              <dd id="queued-job-count">0</dd>
+              <dt>Active downloads</dt>
+              <dd id="active-downloads-value">0</dd>
             </div>
             <div>
-              <dt>Running jobs</dt>
-              <dd id="running-job-count">0</dd>
+              <dt>Ready to seed</dt>
+              <dd id="ready-seed-count-value">0</dd>
             </div>
             <div>
-              <dt>Prepared jobs</dt>
-              <dd id="blocked-job-count">0</dd>
+              <dt>Saved files</dt>
+              <dd id="saved-files-value">0</dd>
             </div>
             <div>
-              <dt>Library items</dt>
-              <dd id="library-count">0</dd>
-            </div>
-            <div>
-              <dt>Device id</dt>
-              <dd id="device-id-value">Unavailable</dd>
+              <dt>Download folder</dt>
+              <dd id="download-folder-value">Unavailable</dd>
             </div>
           </dl>
-          <p class="muted">
-            The current build can pull verified chunks into the local workspace and re-announce completed copies as stable background seed sources.
+          <p id="activity-note" class="muted">
+            Downloads you start from WorldStage show up here automatically. Completed files stay available for background seeding.
           </p>
         </article>
 
         <article class="panel">
           <div class="section-head">
-            <p class="eyebrow">Release</p>
+            <p class="eyebrow">Updates</p>
             <h2>App Updates</h2>
           </div>
           <dl class="stats">
@@ -177,125 +152,162 @@
         </article>
       </section>
 
-      <section class="grid main-grid">
-        <article class="panel">
-          <div class="section-head">
-            <p class="eyebrow">Config</p>
-            <h2>Home Client Settings</h2>
-          </div>
-          <form id="config-form" class="stack-form">
-            <label class="wide-field">
-              <span>Connection link</span>
-              <input id="pairing-link" name="pairingLink" type="text" placeholder="worldstage://pair?... or https://5310s.com/worldstage/client/connect?..." />
-            </label>
-            <div class="pairing-actions">
-              <button id="apply-pairing-link-button" class="primary" type="button">Connect With Link</button>
-              <button id="paste-pairing-link-button" class="ghost" type="button">Paste From Clipboard</button>
-            </div>
-            <p id="pairing-status" class="muted">
-              Use a single connection link from the website when available. The raw token fields below are only a fallback.
-            </p>
-            <details id="advanced-config-panel" class="advanced-panel">
-              <summary>Advanced Settings And Manual Tokens</summary>
-              <div class="advanced-panel-body">
-                <label>
-                  <span>Device name</span>
-                  <input id="device-name" name="deviceName" type="text" maxlength="120" />
-                </label>
-                <label>
-                  <span>Site origin</span>
-                  <input id="site-origin" name="siteOrigin" type="url" placeholder="https://5310s.com" />
-                </label>
-                <label>
-                  <span>Device token</span>
-                  <input id="device-token" name="deviceToken" type="password" placeholder="Issued by the WorldStage site bridge" />
-                </label>
-                <label>
-                  <span>Account token</span>
-                  <input id="account-token" name="accountToken" type="password" placeholder="WorldStage bearer token for downloads, peer announces, and sessions" />
-                </label>
-                <label>
-                  <span>Poll interval (ms)</span>
-                  <input id="poll-interval" name="pollIntervalMs" type="number" min="5000" max="600000" step="1000" />
-                </label>
-                <label>
-                  <span>Download directory</span>
-                  <input id="download-directory" name="downloadDirectory" type="text" />
-                </label>
-                <label class="checkbox">
-                  <input id="background-on-close" name="backgroundOnClose" type="checkbox" />
-                  <span>Hide to tray and keep running when the window closes</span>
-                </label>
-                <label class="checkbox">
-                  <input id="launch-on-login" name="launchOnLogin" type="checkbox" />
-                  <span>Start the desktop client automatically when this computer signs in</span>
-                </label>
-                <label class="checkbox">
-                  <input id="auto-start-agent" name="autoStartAgent" type="checkbox" />
-                  <span>Start the background loop automatically on launch</span>
-                </label>
-                <button class="secondary" type="submit">Save Advanced Settings</button>
-              </div>
-            </details>
-          </form>
-        </article>
-
-        <article class="panel">
-          <div class="section-head">
-            <p class="eyebrow">Queue</p>
-            <h2>Download And Seed Intents</h2>
-          </div>
-          <form id="job-form" class="stack-form compact-form">
-            <label>
-              <span>Video id</span>
-              <input id="job-video-id" name="videoId" type="text" placeholder="video-example-001" />
-            </label>
-            <label>
-              <span>Video title</span>
-              <input id="job-video-title" name="videoTitle" type="text" placeholder="Example queued seed" />
-            </label>
-            <label>
-              <span>Channel id</span>
-              <input id="job-channel-id" name="channelId" type="text" placeholder="channel-example" />
-            </label>
-            <button class="primary" type="submit">Queue Local Intent</button>
-            <button id="clear-finished-button" class="ghost" type="button">Clear Finished</button>
-          </form>
-          <div id="job-list" class="job-list"></div>
-        </article>
+      <section class="panel">
+        <div class="section-head">
+          <p class="eyebrow">Now</p>
+          <h2>Recent WorldStage Activity</h2>
+        </div>
+        <div class="card-actions flush-actions">
+          <button id="clear-finished-button" class="ghost" type="button">Clear Finished</button>
+        </div>
+        <p class="muted">Downloads started from WorldStage appear here automatically.</p>
+        <div id="job-list" class="job-list"></div>
       </section>
 
       <section class="panel">
         <div class="section-head">
           <p class="eyebrow">Library</p>
-          <h2>Background Seed Sources</h2>
+          <h2>Your Background Seed Library</h2>
         </div>
         <p class="muted">
-          These are the completed local copies the desktop client can re-announce and serve to other WorldStage viewers while your browser is closed.
+          Completed local copies stay available here so this Mac can keep helping after your browser closes.
         </p>
         <div id="library-list" class="job-list"></div>
       </section>
 
-      <section class="panel">
-        <div class="section-head">
-          <p class="eyebrow">Paths</p>
-          <h2>Persistent Files</h2>
+      <details id="support-panel" class="panel support-panel">
+        <summary>Troubleshooting And Advanced Settings</summary>
+        <div class="support-grid">
+          <article class="support-card">
+            <div class="section-head">
+              <p class="eyebrow">Recovery</p>
+              <h2>Manual Connection Help</h2>
+            </div>
+            <p id="pairing-status" class="muted">
+              Most people should never need this. If the website gives you a connection link, paste it here.
+            </p>
+            <label class="wide-field">
+              <span>Connection link</span>
+              <input id="pairing-link" name="pairingLink" type="text" placeholder="worldstage://pair?... or https://5310s.com/worldstage/client/connect?..." />
+            </label>
+            <div class="pairing-actions">
+              <button id="apply-pairing-link-button" class="primary" type="button">Use Connection Link</button>
+              <button id="paste-pairing-link-button" class="ghost" type="button">Paste From Clipboard</button>
+              <button id="reload-worldstage-button" class="ghost" type="button">Reload WorldStage</button>
+            </div>
+          </article>
+
+          <article class="support-card">
+            <div class="section-head">
+              <p class="eyebrow">Background</p>
+              <h2>App Preferences</h2>
+            </div>
+            <form id="config-form" class="stack-form">
+              <label>
+                <span>Device name</span>
+                <input id="device-name" name="deviceName" type="text" maxlength="120" />
+              </label>
+              <label>
+                <span>Download directory</span>
+                <input id="download-directory" name="downloadDirectory" type="text" />
+              </label>
+              <label class="checkbox">
+                <input id="background-on-close" name="backgroundOnClose" type="checkbox" />
+                <span>Keep running in the background when the window closes</span>
+              </label>
+              <label class="checkbox">
+                <input id="launch-on-login" name="launchOnLogin" type="checkbox" />
+                <span>Launch WorldStage Client automatically when this computer signs in</span>
+              </label>
+              <label class="checkbox">
+                <input id="auto-start-agent" name="autoStartAgent" type="checkbox" />
+                <span>Start background syncing automatically</span>
+              </label>
+              <div class="card-actions">
+                <button class="secondary" type="submit">Save Preferences</button>
+                <button id="open-data-button" class="ghost" type="button">Open App Data</button>
+                <button id="start-agent-button" class="ghost" type="button">Start Sync</button>
+                <button id="stop-agent-button" class="ghost" type="button">Pause Sync</button>
+              </div>
+              <details id="advanced-config-panel" class="advanced-panel">
+                <summary>Manual Tokens And Site Overrides</summary>
+                <div class="advanced-panel-body">
+                  <label>
+                    <span>Site origin</span>
+                    <input id="site-origin" name="siteOrigin" type="url" placeholder="https://5310s.com" />
+                  </label>
+                  <label>
+                    <span>Device token</span>
+                    <input id="device-token" name="deviceToken" type="password" placeholder="Issued by the WorldStage site bridge" />
+                  </label>
+                  <label>
+                    <span>Account token</span>
+                    <input id="account-token" name="accountToken" type="password" placeholder="WorldStage bearer token for downloads, peer announces, and sessions" />
+                  </label>
+                  <label>
+                    <span>Poll interval (ms)</span>
+                    <input id="poll-interval" name="pollIntervalMs" type="number" min="5000" max="600000" step="1000" />
+                  </label>
+                </div>
+              </details>
+            </form>
+          </article>
+
+          <article class="support-card support-card-wide">
+            <div class="section-head">
+              <p class="eyebrow">Diagnostics</p>
+              <h2>Connection Details</h2>
+            </div>
+            <dl class="stats path-stats">
+              <div>
+                <dt>Site origin</dt>
+                <dd id="site-origin-value">Unavailable</dd>
+              </div>
+              <div>
+                <dt>WorldStage window</dt>
+                <dd id="worldstage-window-value">Closed</dd>
+              </div>
+              <div>
+                <dt>WorldStage page</dt>
+                <dd id="worldstage-url-value">Unavailable</dd>
+              </div>
+              <div>
+                <dt>Transport state</dt>
+                <dd id="transport-state-value">Not connected</dd>
+              </div>
+              <div>
+                <dt>Launch on login</dt>
+                <dd id="launch-on-login-value">Not synced</dd>
+              </div>
+              <div>
+                <dt>Remote status</dt>
+                <dd id="remote-status-value">Not started</dd>
+              </div>
+              <div>
+                <dt>Remote commands</dt>
+                <dd id="remote-command-value">Not started</dd>
+              </div>
+              <div>
+                <dt>Remote report</dt>
+                <dd id="remote-report-value">Not started</dd>
+              </div>
+              <div>
+                <dt>Config path</dt>
+                <dd id="config-path-value">Unavailable</dd>
+              </div>
+              <div>
+                <dt>State path</dt>
+                <dd id="state-path-value">Unavailable</dd>
+              </div>
+              <div>
+                <dt>Workspace root</dt>
+                <dd id="workspace-root-value">Unavailable</dd>
+              </div>
+            </dl>
+          </article>
         </div>
-        <dl class="stats path-stats">
-          <div>
-            <dt>Config path</dt>
-            <dd id="config-path-value">Unavailable</dd>
-          </div>
-          <div>
-            <dt>State path</dt>
-            <dd id="state-path-value">Unavailable</dd>
-          </div>
-          <div>
-            <dt>Workspace root</dt>
-            <dd id="workspace-root-value">Unavailable</dd>
-          </div>
-        </dl>
-      </section>
+      </details>
+      </div>
     </main>
     <script src="./app.js"></script>
   </body>

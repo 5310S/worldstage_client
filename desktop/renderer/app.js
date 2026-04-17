@@ -3,11 +3,35 @@
 const state = {
   snapshot: null,
   unsubscribe: null,
-  advancedConfigTouched: false
+  supportPanelTouched: false,
+  advancedConfigTouched: false,
+  authMode: 'login',
+  authBusy: false
 };
 
 function $(id) {
   return document.getElementById(id);
+}
+
+function setText(id, value) {
+  const node = $(id);
+  if (node) node.textContent = value;
+}
+
+function setDisabled(id, disabled) {
+  const node = $(id);
+  if (node) node.disabled = Boolean(disabled);
+}
+
+function setHidden(id, hidden) {
+  const node = $(id);
+  if (node) node.hidden = Boolean(hidden);
+}
+
+function listen(id, eventName, handler) {
+  const node = $(id);
+  if (!node) return;
+  node.addEventListener(eventName, handler);
 }
 
 function safeText(value, fallback = 'Unavailable') {
@@ -65,103 +89,6 @@ function seedStateTone(stateValue) {
   return 'status-blocked';
 }
 
-function pairingStatusMessage(snapshot) {
-  const config = snapshot.config || {};
-  const runtime = snapshot.runtime || {};
-  const pairing = runtime.pairing || {};
-
-  if (config.deviceToken) {
-    return 'This machine is connected to WorldStage. Advanced settings can stay closed unless you need to troubleshoot.';
-  }
-  if (pairing.lastError) {
-    return `Connection link failed: ${pairing.lastError}`;
-  }
-  if (pairing.registered) {
-    return 'Open a WorldStage connection link and this app should catch it automatically. You can also paste the link here.';
-  }
-  return 'Use a single connection link from the website when available. The raw token fields below are only a fallback.';
-}
-
-function shouldAutoOpenAdvancedConfig(snapshot) {
-  const config = snapshot.config || {};
-  const runtime = snapshot.runtime || {};
-  const pairing = runtime.pairing || {};
-  if (pairing.lastResult === 'pairing_link_failed') return true;
-  return !config.deviceToken && !config.accountToken && Boolean(pairing.lastError);
-}
-
-function setupChecklistEntries(snapshot) {
-  const config = snapshot.config || {};
-  const summary = snapshot.summary || {};
-  const runtime = snapshot.runtime || {};
-  const launchOnLogin = runtime.launchOnLogin || {};
-  const pairing = runtime.pairing || {};
-  const updater = runtime.updater || {};
-  const agent = snapshot.state && snapshot.state.agent ? snapshot.state.agent : {};
-  return [
-    {
-      label: 'Connection link setup',
-      ready: Boolean(config.deviceToken),
-      detail: config.deviceToken
-        ? 'Configured'
-        : pairing.lastError
-          ? `Link handling issue: ${pairing.lastError}`
-          : pairing.registered
-            ? 'The app can accept a WorldStage connection link directly from the website or OS.'
-            : 'Paste a connection link below if your OS does not open the app automatically yet.'
-    },
-    {
-      label: 'Keep running after window close',
-      ready: Boolean(config.backgroundOnClose),
-      detail: config.backgroundOnClose ? 'Enabled' : 'Turn on background close so the client stays alive in the tray.'
-    },
-    {
-      label: 'Start with the computer',
-      ready: Boolean(config.launchOnLogin) && !launchOnLogin.lastError && launchOnLogin.supported !== false,
-      detail: launchOnLogin.lastError
-        ? `Autostart failed: ${launchOnLogin.lastError}`
-        : config.launchOnLogin
-          ? 'Enabled'
-          : 'Enable launch on login so seeding survives reboots without manual relaunch.'
-    },
-    {
-      label: 'Start the agent automatically',
-      ready: Boolean(config.autoStartAgent),
-      detail: config.autoStartAgent ? 'Enabled' : 'Enable agent auto-start so background work begins on launch.'
-    },
-    {
-      label: 'Website bridge connected',
-      ready: Boolean(config.deviceToken),
-      detail: config.deviceToken
-        ? 'Configured'
-        : 'The website still cannot hand this machine downloads until device pairing is set up.'
-    },
-    {
-      label: 'WorldStage account linked',
-      ready: Boolean(config.accountToken),
-      detail: config.accountToken
-        ? 'Configured'
-        : 'Downloads and session bootstrap still require a WorldStage account token.'
-    },
-    {
-      label: 'Background loop running',
-      ready: summary.agentStatus === 'running',
-      detail: summary.agentStatus === 'running'
-        ? `Running (${agent.transportState || 'active'})`
-        : 'Start the agent so the client can claim jobs immediately.'
-    },
-    {
-      label: 'Release updates wired',
-      ready: updater.enabled === true,
-      detail: updater.enabled
-        ? 'GitHub release checks are active for this packaged install.'
-        : updater.disabledReason === 'packaged_build_required'
-          ? 'Updater stays off in development runs. Packaged installs check GitHub releases automatically.'
-          : updater.lastError || 'Updater is currently unavailable.'
-    }
-  ];
-}
-
 function updaterStatusMessage(updater) {
   if (!updater || typeof updater !== 'object') return 'Unavailable';
   if (updater.downloaded) {
@@ -191,62 +118,307 @@ function updaterStatusMessage(updater) {
   return safeText(updater.lastResult, 'Idle');
 }
 
+function pairingStatusMessage(snapshot) {
+  const config = snapshot.config || {};
+  const runtime = snapshot.runtime || {};
+  const pairing = runtime.pairing || {};
+
+  if (config.deviceToken && config.accountToken) {
+    return 'This Mac is already linked. You only need manual recovery if the website hand-off stops working.';
+  }
+  if (pairing.lastError) {
+    return `Connection hand-off failed: ${pairing.lastError}`;
+  }
+  if (pairing.registered) {
+    return 'The app can accept a WorldStage connection link automatically from the website or from your operating system.';
+  }
+  return 'Most people should never need this. If the website gives you a connection link, paste it here.';
+}
+
+function authGateVisible(snapshot) {
+  const config = snapshot.config || {};
+  return !String(config.accountToken || '').trim();
+}
+
+function setAuthMode(mode) {
+  state.authMode = String(mode || '').trim() === 'register' ? 'register' : 'login';
+  const registering = state.authMode === 'register';
+  const loginButton = $('auth-mode-login');
+  const registerButton = $('auth-mode-register');
+  if (loginButton) loginButton.classList.toggle('auth-mode-active', !registering);
+  if (registerButton) registerButton.classList.toggle('auth-mode-active', registering);
+  setText('auth-title', registering ? 'Create your WorldStage account' : 'Sign in to WorldStage');
+  setText('auth-copy', registering
+    ? 'Create a WorldStage account so this computer can keep your downloads and seeding alive in the background.'
+    : 'Sign in with your WorldStage account to connect this computer for background downloads and seeding.');
+  setText('auth-identifier-label', registering ? 'Email' : 'Email or username');
+  setHidden('auth-password-confirm-field', !registering);
+  setText('auth-submit-button', registering ? 'Register' : 'Login');
+  const passwordInput = $('auth-password');
+  if (passwordInput) {
+    passwordInput.autocomplete = registering ? 'new-password' : 'current-password';
+  }
+}
+
+function setAuthStatus(message, tone = '') {
+  const node = $('auth-status');
+  if (!node) return;
+  node.textContent = String(message || '');
+  node.classList.remove('auth-status-error', 'auth-status-ok');
+  if (tone === 'error') node.classList.add('auth-status-error');
+  if (tone === 'ok') node.classList.add('auth-status-ok');
+}
+
+function setAuthBusy(busy) {
+  state.authBusy = Boolean(busy);
+  setDisabled('auth-mode-login', busy);
+  setDisabled('auth-mode-register', busy);
+  setDisabled('auth-identifier', busy);
+  setDisabled('auth-password', busy);
+  setDisabled('auth-password-confirm', busy);
+  setDisabled('auth-submit-button', busy);
+}
+
+function authPayload() {
+  return {
+    mode: state.authMode,
+    identifier: $('auth-identifier').value,
+    password: $('auth-password').value,
+    passwordConfirm: $('auth-password-confirm').value
+  };
+}
+
+function shouldAutoOpenAdvancedConfig(snapshot) {
+  const config = snapshot.config || {};
+  const runtime = snapshot.runtime || {};
+  const pairing = runtime.pairing || {};
+  if (pairing.lastResult === 'pairing_link_failed') return true;
+  return !config.deviceToken && !config.accountToken && Boolean(pairing.lastError);
+}
+
+function shouldAutoOpenSupportPanel(snapshot) {
+  const runtime = snapshot.runtime || {};
+  const pairing = runtime.pairing || {};
+  return Boolean(pairing.lastError);
+}
+
+function connectionOverview(snapshot) {
+  const config = snapshot.config || {};
+  const runtime = snapshot.runtime || {};
+  const pairing = runtime.pairing || {};
+
+  if (config.deviceToken && config.accountToken) {
+    return {
+      accountPill: 'Connected',
+      accountPillClass: 'pill pill-ok',
+      accountStatus: 'Signed in and linked',
+      devicePill: 'Device Linked',
+      devicePillClass: 'pill pill-ok',
+      deviceStatus: 'Ready for website hand-off',
+      note: 'This Mac is connected to WorldStage and can keep downloads and seeding alive in the background.'
+    };
+  }
+
+  if (config.accountToken) {
+    return {
+      accountPill: 'Signed In',
+      accountPillClass: 'pill pill-ok',
+      accountStatus: 'Account connected',
+      devicePill: 'Finishing Setup',
+      devicePillClass: 'pill pill-warn',
+      deviceStatus: 'Open WorldStage to finish linking this Mac',
+      note: 'Your WorldStage account is connected. Open WorldStage once to complete the device hand-off if downloads are not appearing here yet.'
+    };
+  }
+
+  if (pairing.lastError) {
+    return {
+      accountPill: 'Needs Attention',
+      accountPillClass: 'pill pill-warn',
+      accountStatus: 'Connection problem',
+      devicePill: 'Retry Needed',
+      devicePillClass: 'pill pill-warn',
+      deviceStatus: 'Manual recovery available below',
+      note: `We hit a sign-in or hand-off issue: ${pairing.lastError}. Open WorldStage and try again, or use the troubleshooting section below.`
+    };
+  }
+
+  return {
+    accountPill: 'Needs Sign In',
+    accountPillClass: 'pill pill-warn',
+    accountStatus: 'Not connected',
+    devicePill: pairing.registered ? 'Ready To Link' : 'Waiting For Connection',
+    devicePillClass: pairing.registered ? 'pill pill-neutral' : 'pill pill-neutral',
+    deviceStatus: pairing.registered
+      ? 'This app is ready for WorldStage to hand off background work'
+      : 'Protocol hand-off is not confirmed yet',
+    note: pairing.registered
+      ? 'Open WorldStage to sign in or create an account. The website can pair with this app automatically.'
+      : 'Open WorldStage to sign in or create an account. If the website does not hand off automatically, the troubleshooting section has a manual recovery path.'
+  };
+}
+
+function backgroundOverview(snapshot) {
+  const config = snapshot.config || {};
+  const runtime = snapshot.runtime || {};
+  const launchOnLogin = runtime.launchOnLogin || {};
+
+  if (launchOnLogin.lastError) {
+    return {
+      pill: 'Needs Attention',
+      pillClass: 'pill pill-warn',
+      status: 'Autostart needs attention',
+      note: `Launch on login could not be configured: ${launchOnLogin.lastError}`
+    };
+  }
+
+  if (config.backgroundOnClose && config.autoStartAgent && (config.launchOnLogin || launchOnLogin.enabled)) {
+    return {
+      pill: 'Background Ready',
+      pillClass: 'pill pill-ok',
+      status: 'Automatic',
+      note: 'The app stays alive after the window closes, starts background sync automatically, and relaunches with the computer.'
+    };
+  }
+
+  if (config.backgroundOnClose && config.autoStartAgent) {
+    return {
+      pill: 'Mostly Ready',
+      pillClass: 'pill pill-neutral',
+      status: 'Runs in background after launch',
+      note: 'Background work is on, but launch-on-login is disabled. You can turn it on in troubleshooting if you want hands-free restarts after reboot.'
+    };
+  }
+
+  return {
+    pill: 'Needs Setup',
+    pillClass: 'pill pill-warn',
+    status: 'Manual',
+    note: 'Background behavior is partially disabled. Troubleshooting has the manual controls if you want to change it.'
+  };
+}
+
+function readySeedCount(snapshot) {
+  const library = snapshot.state && Array.isArray(snapshot.state.library)
+    ? snapshot.state.library
+    : [];
+  return library.filter((entry) => {
+    const seedState = String(entry && entry.seedState || '').trim();
+    return seedState === 'ready_to_seed' || seedState === 'seeding' || seedState === 'seed_paused';
+  }).length;
+}
+
+function activeDownloadCount(snapshot) {
+  const jobs = snapshot.state && Array.isArray(snapshot.state.jobs)
+    ? snapshot.state.jobs
+    : [];
+  return jobs.filter((job) => {
+    const status = String(job && job.status || '').trim();
+    return status === 'queued' || status === 'running' || status === 'blocked' || status === 'paused';
+  }).length;
+}
+
+function activityNote(snapshot) {
+  const activeDownloads = activeDownloadCount(snapshot);
+  const savedFiles = snapshot.summary ? Number(snapshot.summary.libraryItemCount || 0) : 0;
+  const seeds = readySeedCount(snapshot);
+  if (activeDownloads > 0) {
+    return `${formatNumber(activeDownloads)} background ${activeDownloads === 1 ? 'job is' : 'jobs are'} active right now.`;
+  }
+  if (savedFiles > 0 && seeds > 0) {
+    return `${formatNumber(savedFiles)} saved ${savedFiles === 1 ? 'file is' : 'files are'} available locally, and ${formatNumber(seeds)} ${seeds === 1 ? 'copy is' : 'copies are'} ready to help seed.`;
+  }
+  if (savedFiles > 0) {
+    return `${formatNumber(savedFiles)} saved ${savedFiles === 1 ? 'file is' : 'files are'} available locally.`;
+  }
+  return 'Downloads you start from WorldStage show up here automatically. Completed files stay available for background seeding.';
+}
+
 function renderConfig(snapshot) {
   const config = snapshot.config || {};
+  const supportPanel = $('support-panel');
   const advancedPanel = $('advanced-config-panel');
-  $('device-name').value = config.deviceName || '';
-  $('site-origin').value = config.siteOrigin || '';
-  $('device-token').value = config.deviceToken || '';
-  $('account-token').value = config.accountToken || '';
-  $('poll-interval').value = String(config.pollIntervalMs || 15000);
-  $('download-directory').value = config.downloadDirectory || '';
-  $('background-on-close').checked = Boolean(config.backgroundOnClose);
-  $('launch-on-login').checked = Boolean(config.launchOnLogin);
-  $('auto-start-agent').checked = Boolean(config.autoStartAgent);
-  $('pairing-status').textContent = pairingStatusMessage(snapshot);
+
+  if ($('device-name')) $('device-name').value = config.deviceName || '';
+  if ($('site-origin')) $('site-origin').value = config.siteOrigin || '';
+  if ($('device-token')) $('device-token').value = config.deviceToken || '';
+  if ($('account-token')) $('account-token').value = config.accountToken || '';
+  if ($('poll-interval')) $('poll-interval').value = String(config.pollIntervalMs || 15000);
+  if ($('download-directory')) $('download-directory').value = config.downloadDirectory || '';
+  if ($('background-on-close')) $('background-on-close').checked = Boolean(config.backgroundOnClose);
+  if ($('launch-on-login')) $('launch-on-login').checked = Boolean(config.launchOnLogin);
+  if ($('auto-start-agent')) $('auto-start-agent').checked = Boolean(config.autoStartAgent);
+  setText('pairing-status', pairingStatusMessage(snapshot));
+
+  if (supportPanel && !state.supportPanelTouched) {
+    supportPanel.open = shouldAutoOpenSupportPanel(snapshot);
+  }
   if (advancedPanel && !state.advancedConfigTouched) {
     advancedPanel.open = shouldAutoOpenAdvancedConfig(snapshot);
   }
 }
 
+function renderAuthGate(snapshot) {
+  const locked = authGateVisible(snapshot);
+  setHidden('auth-shell', !locked);
+  setHidden('app-shell', locked);
+  if (!locked) {
+    setAuthStatus('', '');
+    return;
+  }
+  setAuthMode(state.authMode);
+}
+
 function renderSummary(snapshot) {
   const summary = snapshot.summary || {};
   const agentState = snapshot.state && snapshot.state.agent ? snapshot.state.agent : {};
-  const paths = snapshot.paths || {};
   const runtime = snapshot.runtime || {};
-  const transportHost = runtime.transportHost || {};
+  const transportState = snapshot.state && snapshot.state.transport ? snapshot.state.transport : {};
+  const worldstageSite = runtime.worldstageSite || {};
   const launchOnLogin = runtime.launchOnLogin || {};
   const updater = runtime.updater || {};
-  const worldstageSite = runtime.worldstageSite || {};
-  const transportState = snapshot.state && snapshot.state.transport ? snapshot.state.transport : {};
+  const paths = snapshot.paths || {};
 
-  $('agent-pill').className = pillClass(summary.agentStatus);
-  $('agent-pill').textContent = safeText(summary.agentStatus, 'idle');
+  const connection = connectionOverview(snapshot);
+  const background = backgroundOverview(snapshot);
 
-  $('transport-pill').className = summary.transportAvailable ? 'pill pill-ok' : 'pill pill-warn';
-  $('transport-pill').textContent = summary.transportAvailable ? 'Transport Ready' : 'Transport Pending';
+  if ($('account-pill')) {
+    $('account-pill').className = connection.accountPillClass;
+    $('account-pill').textContent = connection.accountPill;
+  }
+  if ($('device-pill')) {
+    $('device-pill').className = connection.devicePillClass;
+    $('device-pill').textContent = connection.devicePill;
+  }
+  if ($('background-pill')) {
+    $('background-pill').className = background.pillClass;
+    $('background-pill').textContent = background.pill;
+  }
 
-  $('close-pill').className = summary.backgroundOnClose ? 'pill pill-ok' : 'pill pill-neutral';
-  $('close-pill').textContent = summary.backgroundOnClose ? 'Background Close Enabled' : 'Quit On Close';
+  setText('account-status-value', connection.accountStatus);
+  setText('device-status-value', connection.deviceStatus);
+  setText('background-mode-value', background.status);
+  setText('last-sync-value', safeText(agentState.lastSyncResult, 'not_started'));
+  setText('account-note', connection.note);
 
-  $('site-origin-value').textContent = safeText(summary.siteOrigin, 'Unconfigured');
-  $('last-cycle-value').textContent = formatTimestamp(agentState.lastCycleAtIso);
-  $('last-sync-value').textContent = safeText(agentState.lastSyncResult, 'not_started');
-  $('transport-state-value').textContent = safeText(agentState.transportState, 'not_connected');
-  $('transport-host-value').textContent = transportHost.windowReady
-    ? `Ready since ${formatTimestamp(transportHost.bootedAtIso)}`
-    : 'Booting';
-  $('transport-capability-value').textContent = safeText(transportHost.capability, 'workspace_preparation');
-  $('worldstage-window-value').textContent = worldstageSite.open
+  setText('active-downloads-value', formatNumber(activeDownloadCount(snapshot)));
+  setText('ready-seed-count-value', formatNumber(readySeedCount(snapshot)));
+  setText('saved-files-value', formatNumber(summary.libraryItemCount || 0));
+  setText('download-folder-value', safeText(summary.downloadDirectory, 'Unavailable'));
+  setText('activity-note', activityNote(snapshot));
+
+  setText('site-origin-value', safeText(summary.siteOrigin, 'Unconfigured'));
+  setText('worldstage-window-value', worldstageSite.open
     ? worldstageSite.visible
       ? 'Open'
       : 'Open in background'
-    : 'Closed';
-  $('worldstage-url-value').textContent = safeText(worldstageSite.url || worldstageSite.lastError, 'Unavailable');
-  $('transport-host-result-value').textContent = safeText(transportState.lastHostResult, 'not_started');
-  $('remote-status-value').textContent = safeText(transportState.lastRemoteStatusResult, 'not_started');
-  $('remote-command-value').textContent = safeText(transportState.lastRemoteCommandResult, 'not_started');
-  $('launch-on-login-value').textContent = launchOnLogin.lastError
+    : 'Closed');
+  setText('worldstage-url-value', safeText(worldstageSite.url || worldstageSite.lastError, 'Unavailable'));
+  setText('transport-state-value', safeText(agentState.transportState, 'not_connected'));
+  setText('remote-status-value', safeText(transportState.lastRemoteStatusResult, 'not_started'));
+  setText('remote-command-value', safeText(transportState.lastRemoteCommandResult, 'not_started'));
+  setText('remote-report-value', safeText(transportState.lastRemoteReportResult, 'not_started'));
+  setText('launch-on-login-value', launchOnLogin.lastError
     ? `Error: ${launchOnLogin.lastError}`
     : launchOnLogin.supported === false
       ? 'Unsupported'
@@ -254,65 +426,31 @@ function renderSummary(snapshot) {
         ? launchOnLogin.strategy === 'linux_autostart_desktop' && launchOnLogin.filePath
           ? `Enabled via ${launchOnLogin.filePath}`
           : 'Enabled'
-        : 'Disabled';
-  $('remote-report-value').textContent = safeText(transportState.lastRemoteReportResult, 'not_started');
-  $('transport-note').textContent = safeText(summary.transportNote, '');
+        : 'Disabled');
+  setText('config-path-value', safeText(paths.configPath, 'Unavailable'));
+  setText('state-path-value', safeText(paths.statePath, 'Unavailable'));
+  setText('workspace-root-value', safeText(paths.workspaceRootPath, 'Unavailable'));
 
-  $('queued-job-count').textContent = formatNumber(summary.queuedJobCount);
-  $('running-job-count').textContent = formatNumber(summary.runningJobCount);
-  $('blocked-job-count').textContent = formatNumber(summary.blockedJobCount);
-  $('library-count').textContent = formatNumber(summary.libraryItemCount);
-  $('device-id-value').textContent = safeText(summary.deviceId, 'Unavailable');
-
-  $('config-path-value').textContent = safeText(paths.configPath, 'Unavailable');
-  $('state-path-value').textContent = safeText(paths.statePath, 'Unavailable');
-  $('workspace-root-value').textContent = safeText(paths.workspaceRootPath, 'Unavailable');
-  $('update-current-version-value').textContent = safeText(updater.currentVersion, 'Unavailable');
-  $('update-latest-version-value').textContent = safeText(updater.latestVersion, updater.currentVersion || 'Unknown');
-  $('update-last-check-value').textContent = formatTimestamp(updater.lastCheckedAtIso);
-  $('update-status-value').textContent = updaterStatusMessage(updater);
-  $('update-note').textContent = updater.downloaded
+  setText('update-current-version-value', safeText(updater.currentVersion, 'Unavailable'));
+  setText('update-latest-version-value', safeText(updater.latestVersion, updater.currentVersion || 'Unknown'));
+  setText('update-last-check-value', formatTimestamp(updater.lastCheckedAtIso));
+  setText('update-status-value', updaterStatusMessage(updater));
+  setText('update-note', updater.downloaded
     ? 'The update package is already on disk. Install it now or quit normally to let supported platforms apply it on exit.'
     : updater.lastResult === 'downloading_update'
       ? `Download progress: ${formatPercent(updater.progressPercent, '0%')} at ${formatBytes(updater.bytesPerSecond || 0, '0 B/s')}/s.`
       : updater.lastError
         ? `GitHub release checks failed: ${updater.lastError}`
         : updater.enabled
-          ? 'Packaged desktop installs check the GitHub release channel and can apply supported updates without a manual reinstall.'
-          : 'Dev builds stay on manual update flow. Packaged installs check GitHub releases automatically.';
+          ? 'Packaged installs check the GitHub release channel in the background.'
+          : 'Dev builds stay on a manual update flow. Packaged installs check GitHub releases automatically.');
 
   const running = summary.agentStatus === 'running';
-  $('start-agent-button').disabled = running;
-  $('stop-agent-button').disabled = !running;
-  $('reload-worldstage-button').disabled = !worldstageSite.open;
-  $('check-updates-button').disabled = updater.checking === true;
-  $('install-update-button').disabled = updater.downloaded !== true;
-}
-
-function renderSetupChecklist(snapshot) {
-  const container = $('setup-checklist');
-  if (!container) return;
-  container.replaceChildren();
-
-  setupChecklistEntries(snapshot).forEach((entry) => {
-    const row = document.createElement('article');
-    row.className = 'setup-row';
-
-    const status = document.createElement('span');
-    status.className = entry.ready ? 'pill pill-ok' : 'pill pill-warn';
-    status.textContent = entry.ready ? 'Ready' : 'Needs Setup';
-
-    const copy = document.createElement('div');
-    const title = document.createElement('strong');
-    title.textContent = entry.label;
-    const detail = document.createElement('p');
-    detail.className = 'muted';
-    detail.textContent = entry.detail;
-    copy.append(title, detail);
-
-    row.append(status, copy);
-    container.appendChild(row);
-  });
+  setDisabled('start-agent-button', running);
+  setDisabled('stop-agent-button', !running);
+  setDisabled('reload-worldstage-button', !worldstageSite.open);
+  setDisabled('check-updates-button', updater.checking === true);
+  setDisabled('install-update-button', updater.downloaded !== true);
 }
 
 function renderJobs(snapshot) {
@@ -320,12 +458,13 @@ function renderJobs(snapshot) {
     ? snapshot.state.jobs
     : [];
   const container = $('job-list');
+  if (!container) return;
   container.replaceChildren();
 
   if (!jobs.length) {
     const empty = document.createElement('article');
     empty.className = 'empty-card';
-    empty.textContent = 'No local download intents queued yet. Add one here now; website-issued intents land through the same queue later.';
+    empty.textContent = 'No downloads yet. Start something from WorldStage and it will appear here automatically.';
     container.appendChild(empty);
     return;
   }
@@ -341,7 +480,7 @@ function renderJobs(snapshot) {
     const header = document.createElement('header');
     const titleWrap = document.createElement('div');
     const title = document.createElement('h3');
-    title.textContent = job.videoTitle || job.videoId || 'Untitled download intent';
+    title.textContent = job.videoTitle || job.videoId || 'Untitled download';
     const subtitle = document.createElement('p');
     subtitle.className = 'muted mono';
     subtitle.textContent = job.videoId || 'video id pending';
@@ -355,20 +494,14 @@ function renderJobs(snapshot) {
     const meta = document.createElement('div');
     meta.className = 'job-meta';
     [
-      `Source: ${safeText(job.source, 'manual')}`,
-      `Action: ${safeText(job.action, 'download_and_seed')}`,
+      `Source: ${safeText(job.source, 'worldstage')}`,
       `Updated: ${formatTimestamp(job.updatedAtIso)}`,
-      job.runnerState ? `Runner: ${job.runnerState}` : '',
+      job.runnerState ? `Stage: ${job.runnerState}` : '',
       job.downloadId ? `Download: ${job.downloadId}` : '',
-      job.sessionId ? `Session: ${job.sessionId}` : '',
-      job.sessionStatus ? `Session status: ${job.sessionStatus}` : '',
+      job.sessionStatus ? `Session: ${job.sessionStatus}` : '',
       job.chunkCount ? `Chunks: ${formatNumber(job.verifiedChunkCount || 0)}/${formatNumber(job.chunkCount)}` : '',
       job.receivedBytes ? `Received: ${formatBytes(job.receivedBytes)}` : '',
-      job.targetPeerId ? `Target peer: ${job.targetPeerId}` : '',
-      job.channelId ? `Channel: ${job.channelId}` : '',
-      job.remoteIntentId ? `Remote intent: ${job.remoteIntentId}` : '',
-      job.workspacePath ? `Workspace: ${job.workspacePath}` : '',
-      job.localFilePath ? `Local file: ${job.localFilePath}` : '',
+      job.localFilePath ? `Saved: ${job.localFilePath}` : '',
       job.note ? `Note: ${job.note}` : ''
     ].filter(Boolean).forEach((label) => {
       const chip = document.createElement('span');
@@ -424,12 +557,13 @@ function renderLibrary(snapshot) {
     ? snapshot.state.library
     : [];
   const container = $('library-list');
+  if (!container) return;
   container.replaceChildren();
 
   if (!library.length) {
     const empty = document.createElement('article');
     empty.className = 'empty-card';
-    empty.textContent = 'Completed local copies appear here once the client assembles and registers them for background seeding.';
+    empty.textContent = 'Completed files will appear here once WorldStage finishes saving them on this Mac.';
     container.appendChild(empty);
     return;
   }
@@ -456,14 +590,12 @@ function renderLibrary(snapshot) {
     meta.className = 'job-meta';
     [
       entry.fileName ? `File: ${entry.fileName}` : '',
-      entry.mimeType ? `Type: ${entry.mimeType}` : '',
       entry.sizeBytes ? `Size: ${formatBytes(entry.sizeBytes)}` : '',
-      entry.chunkCount ? `Chunks: ${formatNumber(entry.chunkCount)} @ ${formatBytes(entry.chunkSize || 0)}` : '',
+      entry.chunkCount ? `Chunks: ${formatNumber(entry.chunkCount)}` : '',
       entry.seedPeerId ? `Seed peer: ${entry.seedPeerId}` : '',
       entry.seedLastAnnouncedAtIso ? `Announced: ${formatTimestamp(entry.seedLastAnnouncedAtIso)}` : '',
-      entry.localPath ? `Local file: ${entry.localPath}` : '',
-      entry.manifestPath ? `Manifest: ${entry.manifestPath}` : '',
-      entry.seedLastError ? `Seed note: ${entry.seedLastError}` : ''
+      entry.localPath ? `Saved: ${entry.localPath}` : '',
+      entry.seedLastError ? `Note: ${entry.seedLastError}` : ''
     ].filter(Boolean).forEach((label) => {
       const chip = document.createElement('span');
       chip.className = 'chip';
@@ -541,9 +673,9 @@ function renderLibrary(snapshot) {
 
 function render(snapshot) {
   state.snapshot = snapshot;
+  renderAuthGate(snapshot);
   renderConfig(snapshot);
   renderSummary(snapshot);
-  renderSetupChecklist(snapshot);
   renderJobs(snapshot);
   renderLibrary(snapshot);
 }
@@ -562,96 +694,100 @@ function configPayload() {
   };
 }
 
-function queuePayload() {
-  return {
-    videoId: $('job-video-id').value,
-    videoTitle: $('job-video-title').value,
-    channelId: $('job-channel-id').value,
-    source: 'manual'
-  };
-}
-
 async function bootstrap() {
   if (!window.worldstageClient) return;
   const snapshot = await window.worldstageClient.getState();
+  setAuthMode('login');
   render(snapshot);
   state.unsubscribe = window.worldstageClient.onStateChanged((nextSnapshot) => {
     render(nextSnapshot);
   });
 
-  $('config-form').addEventListener('submit', async (event) => {
+  listen('auth-mode-login', 'click', () => {
+    setAuthMode('login');
+    setAuthStatus('', '');
+  });
+
+  listen('auth-mode-register', 'click', () => {
+    setAuthMode('register');
+    setAuthStatus('', '');
+  });
+
+  listen('auth-form', 'submit', async (event) => {
+    event.preventDefault();
+    setAuthBusy(true);
+    setAuthStatus('', '');
+    try {
+      const result = await window.worldstageClient.authenticateAccount(authPayload());
+      if ($('auth-password')) $('auth-password').value = '';
+      if ($('auth-password-confirm')) $('auth-password-confirm').value = '';
+      setAuthStatus(state.authMode === 'register' ? 'Account created.' : 'Signed in.', 'ok');
+      render(result.snapshot);
+    } catch (error) {
+      const message = String(error && error.message ? error.message : 'request_failed');
+      setAuthStatus(message, 'error');
+    } finally {
+      setAuthBusy(false);
+    }
+  });
+
+  listen('config-form', 'submit', async (event) => {
     event.preventDefault();
     const next = await window.worldstageClient.saveConfig(configPayload());
     render(next);
   });
 
-  $('advanced-config-panel').addEventListener('toggle', () => {
+  listen('support-panel', 'toggle', () => {
+    state.supportPanelTouched = true;
+  });
+
+  listen('advanced-config-panel', 'toggle', () => {
     state.advancedConfigTouched = true;
   });
 
-  $('job-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const next = await window.worldstageClient.enqueueDownloadJob(queuePayload());
-    $('job-video-id').value = '';
-    $('job-video-title').value = '';
-    $('job-channel-id').value = '';
-    render(next);
+  listen('open-worldstage-button', 'click', async () => {
+    render(await window.worldstageClient.openWorldStage({
+      path: '/worldstage'
+    }));
   });
 
-  $('start-agent-button').addEventListener('click', async () => {
-    render(await window.worldstageClient.startAgent());
-  });
-
-  $('open-worldstage-button').addEventListener('click', async () => {
-    render(await window.worldstageClient.openWorldStage());
-  });
-
-  $('reload-worldstage-button').addEventListener('click', async () => {
+  listen('reload-worldstage-button', 'click', async () => {
     render(await window.worldstageClient.reloadWorldStage());
   });
 
-  $('check-updates-button').addEventListener('click', async () => {
-    render(await window.worldstageClient.checkForUpdates());
-  });
-
-  $('install-update-button').addEventListener('click', async () => {
-    await window.worldstageClient.installUpdate();
-  });
-
-  $('open-release-page-button').addEventListener('click', async () => {
-    render(await window.worldstageClient.openReleasePage());
-  });
-
-  $('stop-agent-button').addEventListener('click', async () => {
-    render(await window.worldstageClient.stopAgent());
-  });
-
-  $('clear-finished-button').addEventListener('click', async () => {
-    render(await window.worldstageClient.clearFinishedJobs());
-  });
-
-  $('open-downloads-button').addEventListener('click', async () => {
+  listen('open-downloads-button', 'click', async () => {
     await window.worldstageClient.openDownloadDirectory();
   });
 
-  $('open-data-button').addEventListener('click', async () => {
+  listen('open-data-button', 'click', async () => {
     await window.worldstageClient.openUserDataDirectory();
   });
 
-  $('apply-home-defaults-button').addEventListener('click', async () => {
-    const saved = await window.worldstageClient.saveConfig({
-      ...configPayload(),
-      backgroundOnClose: true,
-      launchOnLogin: true,
-      autoStartAgent: true
-    });
-    const started = saved.summary && saved.summary.agentStatus === 'running'
-      ? saved
-      : await window.worldstageClient.startAgent();
-    render(started);
+  listen('start-agent-button', 'click', async () => {
+    render(await window.worldstageClient.startAgent());
   });
 
-  $('apply-pairing-link-button').addEventListener('click', async () => {
+  listen('stop-agent-button', 'click', async () => {
+    render(await window.worldstageClient.stopAgent());
+  });
+
+  listen('check-updates-button', 'click', async () => {
+    render(await window.worldstageClient.checkForUpdates());
+  });
+
+  listen('install-update-button', 'click', async () => {
+    await window.worldstageClient.installUpdate();
+  });
+
+  listen('open-release-page-button', 'click', async () => {
+    render(await window.worldstageClient.openReleasePage());
+  });
+
+  listen('clear-finished-button', 'click', async () => {
+    render(await window.worldstageClient.clearFinishedJobs());
+  });
+
+  listen('apply-pairing-link-button', 'click', async () => {
     const link = $('pairing-link').value;
     const next = await window.worldstageClient.applyPairingLink({
       link
@@ -660,7 +796,7 @@ async function bootstrap() {
     render(next);
   });
 
-  $('paste-pairing-link-button').addEventListener('click', async () => {
+  listen('paste-pairing-link-button', 'click', async () => {
     const clipboardText = await window.worldstageClient.readClipboardText();
     if (!clipboardText) return;
     $('pairing-link').value = clipboardText;

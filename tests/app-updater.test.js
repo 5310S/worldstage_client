@@ -48,6 +48,21 @@ async function main() {
   assert.equal(disabledUpdater.snapshot().enabled, false, 'Expected updater to stay disabled for development runs.');
   assert.equal(disabledUpdater.snapshot().disabledReason, 'packaged_build_required');
 
+  const linuxArm64Updater = new WorldStageAppUpdater({
+    app: {
+      isPackaged: true,
+      getVersion() {
+        return '0.1.0';
+      }
+    },
+    platform: 'linux',
+    arch: 'arm64',
+    autoUpdater: new FakeAutoUpdater()
+  });
+
+  assert.equal(linuxArm64Updater.snapshot().enabled, false, 'Expected Linux ARM64 updater to stay disabled until a dedicated update feed exists.');
+  assert.equal(linuxArm64Updater.snapshot().disabledReason, 'linux_arm64_update_feed_unavailable');
+
   const fakeAutoUpdater = new FakeAutoUpdater();
   const openedExternal = [];
   const timers = [];
@@ -72,6 +87,8 @@ async function main() {
   });
 
   updater.initialize();
+  assert.equal(updater.snapshot().platform, process.platform);
+  assert.equal(updater.snapshot().arch, process.arch);
   assert.equal(fakeAutoUpdater.autoDownload, true, 'Expected packaged updater to auto-download release updates.');
   assert.equal(fakeAutoUpdater.autoInstallOnAppQuit, true, 'Expected packaged updater to auto-install on quit when supported.');
   assert.deepEqual(fakeAutoUpdater.feedConfig, {

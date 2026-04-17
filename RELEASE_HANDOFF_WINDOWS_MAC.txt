@@ -15,7 +15,8 @@ Current state:
 - updater is wired via electron-updater to 5310S/worldstage_client
 - expected Windows asset is `WorldStageClient-windows-x64.exe`
 - public site route `/downloads/worldstage-client/windows` should land users on the Windows installer
-- tagged GitHub Actions builds publish with `WORLDSTAGE_CLIENT_PUBLISH=always`
+- tagged GitHub Actions builds publish through a single serialized GitHub release upload job
+- manual `workflow_dispatch` runs can backfill an existing release tag safely
 - likely remaining gap is real Windows installer verification and possibly signing
 
 Your job:
@@ -62,9 +63,10 @@ Repos:
 Current state:
 - GitHub releases are the source of truth for installers and updater feed
 - updater is wired via electron-updater to 5310S/worldstage_client
-- current expected mac asset is `WorldStageClient-mac-x64.dmg`
+- current expected mac asset is `WorldStageClient-mac-universal.dmg`
 - public site route `/downloads/worldstage-client/macos` should land users on the mac installer
-- tagged GitHub Actions builds publish with `WORLDSTAGE_CLIENT_PUBLISH=always`
+- tagged GitHub Actions builds publish through a single serialized GitHub release upload job
+- manual `workflow_dispatch` runs can backfill an existing release tag safely
 - likely remaining gaps are real DMG verification, signing/notarization, and possibly Apple Silicon support
 
 Your job:
@@ -98,7 +100,6 @@ Acceptance criteria:
 - public download path is still correct if anything changed
 - final response includes:
   - what you fixed
-  - exact mac artifact produced and arch
+  - exact mac artifact produced and arch/universal status
   - whether the mac release is production-ready
   - any remaining blocker
-

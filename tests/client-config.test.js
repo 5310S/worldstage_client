@@ -18,7 +18,7 @@ assert.equal(defaults.siteOrigin, 'https://5310s.com');
 assert.equal(defaults.deviceToken, '');
 assert.equal(defaults.accountToken, '');
 assert.equal(defaults.downloadDirectory, path.join('/tmp', 'worldstage-downloads'));
-assert.equal(defaults.launchOnLogin, false);
+assert.equal(defaults.launchOnLogin, true);
 
 assert.equal(normalizeSiteOrigin('5310s.com', ''), 'https://5310s.com');
 assert.equal(normalizeSiteOrigin('https://5310s.com/worldstage?foo=bar', ''), 'https://5310s.com');

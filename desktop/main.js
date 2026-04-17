@@ -8,7 +8,9 @@ const {
   Menu,
   Tray,
   ipcMain,
+  net,
   nativeImage,
+  session,
   shell
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
@@ -27,6 +29,13 @@ const {
 
 const CONFIG_FILE_NAME = 'worldstage-client-config.json';
 const STATE_FILE_NAME = 'worldstage-client-state.json';
+const WORLDSTAGE_SITE_PARTITION = 'persist:worldstage-site';
+const WORLDSTAGE_SHELL_ROOT = path.join(__dirname, 'worldstage-shell');
+const WORLDSTAGE_SHELL_FILES = Object.freeze({
+  html: path.join(WORLDSTAGE_SHELL_ROOT, 'worldstage.html'),
+  space: path.join(WORLDSTAGE_SHELL_ROOT, 'worldstage-space.js'),
+  three: path.join(WORLDSTAGE_SHELL_ROOT, 'three.module.js')
+});
 
 let mainWindow = null;
 let transportWindow = null;
@@ -35,6 +44,7 @@ let tray = null;
 let agent = null;
 let updater = null;
 let isQuitting = false;
+let worldstageShellProtocolRegistered = false;
 const pendingPairingLinks = [];
 const transportHostState = {
   windowReady: false,
@@ -96,6 +106,69 @@ function ensureDirectories() {
   fs.mkdirSync(paths.userDataPath, { recursive: true });
   fs.mkdirSync(paths.downloadDirectory, { recursive: true });
   return paths;
+}
+
+function localWorldStageShellFileForPath(pathname = '') {
+  const route = String(pathname || '').trim();
+  if (!route) return '';
+  if (route === '/worldstage-space.js') return WORLDSTAGE_SHELL_FILES.space;
+  if (route === '/three.module.js') return WORLDSTAGE_SHELL_FILES.three;
+  if (route === '/worldstage-login' || route === '/worldstage/login' || route === '/worldstage.html') {
+    return WORLDSTAGE_SHELL_FILES.html;
+  }
+  if (route === '/worldstage' || route.startsWith('/worldstage/')) {
+    return WORLDSTAGE_SHELL_FILES.html;
+  }
+  return '';
+}
+
+function worldStageShellContentType(filePath) {
+  const extension = path.extname(String(filePath || '').trim()).toLowerCase();
+  if (extension === '.html') return 'text/html; charset=utf-8';
+  if (extension === '.js') return 'text/javascript; charset=utf-8';
+  return 'application/octet-stream';
+}
+
+function shouldServeLocalWorldStageShell(requestUrl) {
+  const raw = String(requestUrl || '').trim();
+  if (!raw) return false;
+  try {
+    const target = new URL(raw);
+    const site = new URL(currentWorldStageSiteOrigin());
+    if (target.origin !== site.origin) return false;
+    return Boolean(localWorldStageShellFileForPath(target.pathname));
+  } catch (_) {
+    return false;
+  }
+}
+
+function worldStageShellResponse(filePath) {
+  const body = fs.readFileSync(filePath);
+  return new Response(body, {
+    status: 200,
+    headers: {
+      'cache-control': 'no-store',
+      'content-type': worldStageShellContentType(filePath)
+    }
+  });
+}
+
+function registerWorldStageShellProtocol() {
+  if (worldstageShellProtocolRegistered) return;
+  const partitionSession = session.fromPartition(WORLDSTAGE_SITE_PARTITION);
+  partitionSession.protocol.handle('https', async (request) => {
+    try {
+      if (!shouldServeLocalWorldStageShell(request.url)) {
+        return net.fetch(request, { bypassCustomProtocolHandlers: true });
+      }
+      const filePath = localWorldStageShellFileForPath(new URL(request.url).pathname);
+      if (!filePath) return net.fetch(request, { bypassCustomProtocolHandlers: true });
+      return worldStageShellResponse(filePath);
+    } catch (_) {
+      return net.fetch(request, { bypassCustomProtocolHandlers: true });
+    }
+  });
+  worldstageShellProtocolRegistered = true;
 }
 
 function createTrayIcon() {
@@ -193,6 +266,29 @@ function allowWorldStageNavigation(targetUrl) {
   return isWorldStageSiteUrlAllowed(currentWorldStageSiteOrigin(), targetUrl);
 }
 
+async function applyWorldStageAuthMode(window, authMode) {
+  const mode = String(authMode || '').trim();
+  if (!window || window.isDestroyed() || (mode !== 'login' && mode !== 'register')) return;
+  const classAction = mode === 'register' ? 'add' : 'remove';
+  const focusTarget = mode === 'register'
+    ? 'passwordConfirmInput || emailInput || passwordInput'
+    : 'emailInput || passwordInput || passwordConfirmInput';
+  try {
+    await window.webContents.executeJavaScript(`
+      (() => {
+        const authFields = document.querySelector('.worldstage-auth-fields');
+        const emailInput = document.getElementById('worldstage-auth-email');
+        const passwordInput = document.getElementById('worldstage-auth-password');
+        const passwordConfirmInput = document.getElementById('worldstage-auth-password-confirm');
+        if (authFields) authFields.classList.${classAction}('register-mode');
+        const target = ${focusTarget};
+        if (target && typeof target.focus === 'function') target.focus();
+        return true;
+      })();
+    `, true);
+  } catch (_) {}
+}
+
 function updateWorldStageLocation(urlValue) {
   syncWorldStageSiteState({
     url: String(urlValue || '').trim(),
@@ -272,7 +368,9 @@ function attachWorldStageWindowHandlers(window) {
 }
 
 async function openWorldStageWindow(options = {}) {
-  const targetUrl = String(options.targetUrl || currentWorldStageSiteUrl()).trim() || currentWorldStageSiteUrl();
+  const defaultUrl = currentWorldStageSiteUrl(String(options.path || '/worldstage').trim() || '/worldstage');
+  const targetUrl = String(options.targetUrl || defaultUrl).trim() || defaultUrl;
+  const authMode = String(options.authMode || '').trim();
   const openedAtIso = nowIso();
 
   if (worldstageSiteWindow && !worldstageSiteWindow.isDestroyed()) {
@@ -287,6 +385,7 @@ async function openWorldStageWindow(options = {}) {
     }
     worldstageSiteWindow.show();
     worldstageSiteWindow.focus();
+    await applyWorldStageAuthMode(worldstageSiteWindow, authMode);
     pushSnapshot();
     return decorateSnapshot(agent.snapshot());
   }
@@ -304,7 +403,7 @@ async function openWorldStageWindow(options = {}) {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
-      partition: 'persist:worldstage-site'
+      partition: WORLDSTAGE_SITE_PARTITION
     }
   });
 
@@ -319,6 +418,7 @@ async function openWorldStageWindow(options = {}) {
   });
   await worldstageSiteWindow.loadURL(targetUrl);
   worldstageSiteWindow.show();
+  await applyWorldStageAuthMode(worldstageSiteWindow, authMode);
   pushSnapshot();
   return decorateSnapshot(agent.snapshot());
 }
@@ -348,16 +448,21 @@ function createMainWindow() {
     height: 900,
     minWidth: 1080,
     minHeight: 760,
-    backgroundColor: '#0a0e16',
+    backgroundColor: '#06070b',
+    title: '5310S - WorldStage',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      partition: WORLDSTAGE_SITE_PARTITION
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  worldstageSiteWindow = mainWindow;
+  attachWorldStageWindowHandlers(mainWindow);
+  mainWindow.loadURL(currentWorldStageSiteUrl('/worldstage-login'));
 
   mainWindow.on('show', () => {
     if (agent) agent.setWindowVisible(true);
@@ -614,6 +719,22 @@ function registerIpc() {
     pushSnapshot(snapshot);
     return decorateSnapshot(snapshot);
   });
+  ipcMain.handle('client:authenticate-account', async (_event, payload) => {
+    const authenticated = await agent.authenticateAccount(payload && payload.mode, payload || {});
+    let snapshot = authenticated.snapshot;
+    if (agent.state.agent.status === 'running') {
+      snapshot = await agent.runCycle();
+    } else if (agent.config.autoStartAgent) {
+      snapshot = await agent.start();
+    }
+    applyLaunchOnLoginPreference();
+    refreshTrayMenu();
+    pushSnapshot(snapshot);
+    return {
+      ...authenticated,
+      snapshot: decorateSnapshot(snapshot)
+    };
+  });
   ipcMain.handle('client:apply-pairing-link', async (_event, payload) => {
     return applyPairingLink(payload && payload.link, {
       source: 'renderer',
@@ -718,7 +839,13 @@ function registerIpc() {
     await updater.openReleasePage();
     return decorateSnapshot(agent.snapshot());
   });
-  ipcMain.handle('client:open-worldstage', async () => openWorldStageWindow());
+  ipcMain.handle('client:open-worldstage', async (_event, payload) => {
+    return openWorldStageWindow({
+      path: payload && payload.path,
+      authMode: payload && payload.authMode,
+      forceReload: payload && payload.forceReload
+    });
+  });
   ipcMain.handle('client:reload-worldstage', async () => reloadWorldStageWindow());
   ipcMain.handle('transport:job-update', async (_event, payload) => {
     const snapshot = await agent.applyTransportUpdate(payload);
@@ -796,6 +923,7 @@ function registerIpc() {
 }
 
 app.whenReady().then(async () => {
+  registerWorldStageShellProtocol();
   const paths = ensureDirectories();
   agent = new WorldStageClientAgent({
     configPath: paths.configPath,

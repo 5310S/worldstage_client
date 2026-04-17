@@ -47,11 +47,11 @@ async function main() {
     schemes: ['worldstage']
   }], 'Expected packaged clients to register the WorldStage pairing protocol.');
   assert.deepEqual(packageJson.build.mac.target, ['dmg'], 'Expected mac packaging target.');
-  assert.equal(packageJson.build.mac.artifactName, 'WorldStageClient-mac-x64.${ext}', 'Expected a stable mac release asset name for latest-download links.');
+  assert.equal(packageJson.build.mac.artifactName, 'WorldStageClient-mac-${arch}.${ext}', 'Expected mac packaging to produce architecture-specific asset names.');
   assert.deepEqual(packageJson.build.win.target, ['nsis'], 'Expected Windows packaging target.');
-  assert.equal(packageJson.build.win.artifactName, 'WorldStageClient-windows-x64.${ext}', 'Expected a stable Windows release asset name for latest-download links.');
-  assert.deepEqual(packageJson.build.linux.target, ['AppImage', 'deb'], 'Expected Linux packaging targets.');
-  assert.equal(packageJson.build.linux.artifactName, 'WorldStageClient-linux-x64.${ext}', 'Expected stable Linux release asset names for latest-download links.');
+  assert.equal(packageJson.build.win.artifactName, 'WorldStageClient-windows-${arch}.${ext}', 'Expected Windows packaging to keep stable per-arch asset names.');
+  assert.deepEqual(packageJson.build.linux.target, ['AppImage', 'deb', 'rpm', 'pacman'], 'Expected Linux packaging targets to cover AppImage, Debian, RPM, and Arch packages.');
+  assert.equal(packageJson.build.linux.artifactName, 'WorldStageClient-linux-${arch}.${ext}', 'Expected Linux packaging to produce architecture-specific asset names.');
 
   const env = buildDesktopDistEnv({
     PATH: '/usr/bin',
