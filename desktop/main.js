@@ -14,6 +14,7 @@ const {
 const { autoUpdater } = require('electron-updater');
 const { WorldStageClientAgent } = require('../lib/client-agent');
 const { WorldStageAppUpdater } = require('../lib/app-updater');
+const { buildWorldStageUpdaterDesktopNotice } = require('../lib/worldstage-updater-desktop-notice');
 const { resolveWorldStageReleaseConfig } = require('../lib/worldstage-release');
 const { syncLaunchOnLogin } = require('../lib/launch-on-login');
 const { WorldStageLocalServer } = require('../lib/worldstage-local-server');
@@ -39,6 +40,7 @@ let updater = null;
 let worldstageLocalServer = null;
 let worldstageLocalServerStartPromise = null;
 let isQuitting = false;
+let pendingUpdaterDesktopNoticeAction = '';
 const pendingPairingLinks = [];
 const transportHostState = {
   windowReady: false,
@@ -540,6 +542,32 @@ function hideMainWindow() {
   mainWindow.hide();
 }
 
+function handleUpdaterDesktopNoticeAction(action) {
+  const nextAction = String(action || pendingUpdaterDesktopNoticeAction || 'show').trim() || 'show';
+  pendingUpdaterDesktopNoticeAction = '';
+  if (nextAction === 'release' && updater) {
+    Promise.resolve(updater.openReleasePage()).then(() => pushSnapshot()).catch(() => {});
+    return;
+  }
+  showMainWindow();
+}
+
+function showUpdaterDesktopNotice(notice) {
+  if (!notice || notice.visible !== true) return false;
+  if (!tray || typeof tray.displayBalloon !== 'function' || process.platform !== 'win32') return false;
+  pendingUpdaterDesktopNoticeAction = String(notice.clickAction || 'show').trim() || 'show';
+  try {
+    tray.displayBalloon({
+      iconType: String(notice.key || '').startsWith('error:') ? 'error' : 'info',
+      title: String(notice.title || 'WorldStage Client Update').trim() || 'WorldStage Client Update',
+      content: String(notice.body || '').trim() || 'A WorldStage Client update is ready.'
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
 function refreshTrayMenu() {
   if (!tray || !agent) return;
   const running = agent.state.agent.status === 'running';
@@ -727,6 +755,9 @@ function createTray() {
     }
     hideMainWindow();
     if (agent) agent.setWindowVisible(false);
+  });
+  tray.on('balloon-click', () => {
+    handleUpdaterDesktopNoticeAction();
   });
   refreshTrayMenu();
 }
@@ -956,10 +987,18 @@ app.whenReady().then(async () => {
     autoUpdater,
     shell
   });
-  updater.onChange(() => {
+  let previousUpdaterState = updater.snapshot();
+  updater.onChange((snapshot) => {
+    const notice = buildWorldStageUpdaterDesktopNotice({
+      platform: process.platform,
+      previous: previousUpdaterState,
+      current: snapshot
+    });
+    previousUpdaterState = snapshot;
     refreshTrayMenu();
     pushSnapshot();
     pushWorldStageUpdaterState();
+    showUpdaterDesktopNotice(notice);
   });
   updater.initialize();
   agent.on('changed', (snapshot) => {
