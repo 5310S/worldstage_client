@@ -26,6 +26,7 @@ async function main() {
   assert.match(workflow, /actions\/download-artifact@v4/, 'Expected tagged builds to collect packaged artifacts before publishing the release.');
   assert.match(workflow, /needs:\s*build/, 'Expected release publishing to wait until every OS package job finishes.');
   assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/, 'Expected tagged builds to authenticate GitHub release publishing.');
+  assert.match(workflow, /GH_REPO:\s*\$\{\{ github\.repository \}\}/, 'Expected the publish job to target the GitHub repository explicitly without relying on a local checkout.');
   assert.match(workflow, /gh release create/, 'Expected the release workflow to create the GitHub release when the tag is first published.');
   assert.match(workflow, /gh release upload/, 'Expected the release workflow to upload packaged artifacts after all OS builds finish.');
 
