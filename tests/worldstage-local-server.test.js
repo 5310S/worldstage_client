@@ -67,6 +67,7 @@ function readJsonBody(req) {
 async function startMockWorldStageUpstream(port) {
   const state = {
     requests: [],
+    removedVideoIds: [],
     tokens: new Map([
       ['ws-auth-login', { id: 'acct-login', name: 'viewer@example.com' }],
       ['ws-auth-register', { id: 'acct-register', name: 'builder@example.com' }],
@@ -205,6 +206,18 @@ async function startMockWorldStageUpstream(port) {
       const updated = { id: account.id, name: username };
       state.tokens.set(token, updated);
       jsonResponse(res, 200, { ok: true, account: updated });
+      return;
+    }
+
+    if (req.method === 'DELETE' && reqUrl.pathname.startsWith('/api/worldstage/videos/')) {
+      const token = authorization.startsWith('Bearer ') ? authorization.slice('Bearer '.length).trim() : '';
+      if (!state.tokens.has(token)) {
+        jsonResponse(res, 401, { error: 'invalid_auth_token' });
+        return;
+      }
+      const videoId = decodeURIComponent(reqUrl.pathname.slice('/api/worldstage/videos/'.length));
+      state.removedVideoIds.push(videoId);
+      jsonResponse(res, 200, { ok: true, removedVideoId: videoId });
       return;
     }
 
@@ -444,6 +457,18 @@ async function postJson(url, body, headers = {}) {
     assert.strictEqual(usernameCalls.length, 1, 'Rejected CSRF attempts should not reach the upstream WorldStage write endpoint.');
     const bootstrapCalls = upstream.state.requests.filter((entry) => entry.path === '/api/worldstage/bootstrap');
     assert.ok(bootstrapCalls.some((entry) => entry.authorization === 'Bearer ws-auth-login'), 'Generic WorldStage reads should forward the server-side bearer token upstream.');
+
+    response = await fetch(`${baseUrl}/api/worldstage/videos/vid-1`, {
+      method: 'DELETE',
+      headers: {
+        Cookie: loginCookieHeader,
+        'X-WorldStage-CSRF': loginCsrfCookie.split('=')[1]
+      }
+    });
+    assert.strictEqual(response.status, 200, 'Cookie-authenticated DELETE requests should proxy through the local WorldStage bridge.');
+    payload = await response.json();
+    assert.strictEqual(payload.removedVideoId, 'vid-1');
+    assert.deepStrictEqual(upstream.state.removedVideoIds, ['vid-1'], 'Hosted-video deletes should be forwarded upstream with the current account session.');
 
     response = await fetch(`${baseUrl}/worldstage-login`, {
       headers: { Cookie: loginCookieHeader },

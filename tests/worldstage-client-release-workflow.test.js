@@ -15,7 +15,7 @@ async function main() {
   assert.match(workflow, /contents:\s*write/, 'Expected release workflow permissions to allow publishing GitHub release assets.');
   assert.match(workflow, /npm ci/, 'Expected the workflow to install dependencies reproducibly.');
   assert.match(workflow, /npm test/, 'Expected the workflow to run tests before packaging.');
-  assert.match(workflow, /sudo apt-get install -y rpm/, 'Expected Linux workflow builds to install rpm tooling before packaging the rpm target.');
+  assert.match(workflow, /sudo apt-get install -y rpm libarchive-tools/, 'Expected Linux workflow builds to install the rpm and bsdtar tooling required by the Linux packaging targets.');
   assert.match(workflow, /--linux --x64/, 'Expected Linux release builds to emit a stable x64 artifact.');
   assert.match(workflow, /--win --x64/, 'Expected Windows release builds to emit a stable x64 artifact.');
   assert.match(workflow, /--mac --x64/, 'Expected macOS release builds to emit a stable x64 artifact.');

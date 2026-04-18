@@ -444,6 +444,7 @@ async function main() {
     assert.equal(remoteJob.progressPercent, 18);
     assert.equal(remoteJob.sessionAnswer.type, 'answer');
     assert.equal(remoteJob.creatorCandidates.length, 1);
+    const remoteJobWorkspacePath = remoteJob.workspacePath;
     assert.ok(localJob);
     assert.equal(localJob.status, 'blocked');
     assert.equal(localJob.runnerState, 'awaiting_transport_worker');
@@ -496,6 +497,7 @@ async function main() {
     assert.equal(completedJob.progressPercent, 100);
     assert.ok(completedJob.localFilePath.endsWith('Remote Seed.mp4'));
     assert.equal(fs.readFileSync(completedJob.localFilePath, 'utf8'), 'alpha');
+    const completedLocalFilePath = completedJob.localFilePath;
     assert.equal(verifiedSnapshot.state.library.length, 1);
     assert.equal(verifiedSnapshot.state.library[0].videoId, 'video-remote-1');
     assert.equal(verifiedSnapshot.state.library[0].localPath, completedJob.localFilePath);
@@ -569,6 +571,9 @@ async function main() {
 
     const removedByRemote = await agent.runCycle();
     assert.equal(removedByRemote.state.library.length, 0);
+    assert.equal(removedByRemote.state.jobs.some((job) => job.videoId === 'video-remote-1'), false);
+    assert.equal(fs.existsSync(completedLocalFilePath), false);
+    assert.equal(fs.existsSync(remoteJobWorkspacePath), false);
     assert.equal(removedByRemote.state.transport.lastCommandCursor, 'cmd-cursor-5');
     assert.equal(removedByRemote.state.transport.pendingRemoteCommandCount, 0);
     assert.equal(remoteCommandResultCalls.length, 4);
