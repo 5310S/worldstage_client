@@ -20,10 +20,14 @@ async function main() {
   assert.match(workflow, /--win --x64/, 'Expected Windows release builds to emit a stable x64 artifact.');
   assert.match(workflow, /--mac --x64/, 'Expected macOS release builds to emit a stable x64 artifact.');
   assert.match(workflow, /npm run desktop:dist -- \$\{\{ matrix\.dist_args \}\}/, 'Expected the workflow to package through the desktop dist wrapper.');
-  assert.match(workflow, /WORLDSTAGE_CLIENT_PUBLISH:\s*always/, 'Expected tagged builds to switch the desktop dist wrapper into GitHub publishing mode.');
-  assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/, 'Expected tagged builds to authenticate GitHub release publishing.');
+  assert.match(workflow, /WORLDSTAGE_CLIENT_PUBLISH:\s*never/, 'Expected platform builds to package without racing on GitHub release creation.');
   assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/, 'Expected the workflow to disable signing autodiscovery on CI by default.');
   assert.match(workflow, /actions\/upload-artifact@v4/, 'Expected the workflow to upload packaged desktop artifacts.');
+  assert.match(workflow, /actions\/download-artifact@v4/, 'Expected tagged builds to collect packaged artifacts before publishing the release.');
+  assert.match(workflow, /needs:\s*build/, 'Expected release publishing to wait until every OS package job finishes.');
+  assert.match(workflow, /GH_TOKEN:\s*\$\{\{ secrets\.GITHUB_TOKEN \}\}/, 'Expected tagged builds to authenticate GitHub release publishing.');
+  assert.match(workflow, /gh release create/, 'Expected the release workflow to create the GitHub release when the tag is first published.');
+  assert.match(workflow, /gh release upload/, 'Expected the release workflow to upload packaged artifacts after all OS builds finish.');
 
   console.log('worldstage-client-release-workflow.test.js: ok');
 }
