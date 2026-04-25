@@ -16,6 +16,8 @@ async function main() {
   assert.match(workflow, /publish_release:/, 'Expected manual release publishes to require an explicit opt-in input.');
   assert.match(workflow, /release_tag:/, 'Expected manual release publishes to accept a target release tag.');
   assert.doesNotMatch(workflow, /\$\{\{\s*inputs\./, 'Expected workflow expressions to use github.event.inputs so push events compile.');
+  assert.doesNotMatch(workflow, /build:\n\s+if:.*matrix\./, 'Expected matrix filtering to stay off job-level if expressions.');
+  assert.match(workflow, /github\.event\.inputs\.target == matrix\.target/, 'Expected manual target filtering to happen after matrix expansion.');
   assert.match(workflow, /contents:\s*write/, 'Expected release workflow permissions to allow publishing GitHub release assets.');
   assert.match(workflow, /npm ci/, 'Expected the workflow to install dependencies reproducibly.');
   assert.match(workflow, /Sync release package version/, 'Expected release builds to sync package versions from release tags before npm ci.');

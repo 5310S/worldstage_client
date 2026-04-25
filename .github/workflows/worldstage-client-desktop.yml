@@ -34,7 +34,6 @@ permissions:
 
 jobs:
   build:
-    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
     name: Build ${{ matrix.target }} ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -64,32 +63,38 @@ jobs:
 
     steps:
       - name: Checkout
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         uses: actions/checkout@v4
 
       - name: Setup Node
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
       - name: Sync release package version
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         run: node scripts/worldstage-client-release-version.js
         env:
           WORLDSTAGE_CLIENT_RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || github.event.inputs.release_tag || '' }}
 
       - name: Install dependencies
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         run: npm ci
 
       - name: Run tests
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         run: npm test
 
       - name: Install Linux packaging tools
-        if: ${{ matrix.target == 'linux' }}
+        if: ${{ matrix.target == 'linux' && (github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target) }}
         run: |
           sudo apt-get update
           sudo apt-get install -y rpm libarchive-tools
 
       - name: Build desktop package
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         run: npm run desktop:dist -- ${{ matrix.dist_args }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -103,9 +108,11 @@ jobs:
           APPLE_TEAM_ID: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.APPLE_TEAM_ID || '' }}
 
       - name: Verify release artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         run: node scripts/verify-release-artifacts.js ${{ matrix.target }} ${{ matrix.arch }} ${{ matrix.publish_update_metadata }}
 
       - name: Upload packaged artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         uses: actions/upload-artifact@v4
         with:
           name: worldstage-client-${{ matrix.target }}-${{ matrix.arch }}
@@ -113,7 +120,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload updater metadata
-        if: ${{ matrix.publish_update_metadata }}
+        if: ${{ matrix.publish_update_metadata && (github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target) }}
         uses: actions/upload-artifact@v4
         with:
           name: worldstage-client-${{ matrix.target }}-${{ matrix.arch }}-metadata
