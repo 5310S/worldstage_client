@@ -8,7 +8,7 @@ Current scaffold status:
 
 - Electron app shell with tray/background behavior
 - Electron Builder packaging targets for Linux, Windows, and macOS
-- GitHub release publishing metadata for packaged desktop builds, with stable release asset names for Windows, macOS, Linux AppImage, and Linux `.deb`
+- GitHub release publishing metadata for packaged desktop builds, with stable release asset names for Windows, universal macOS, Linux AppImage, Linux `.deb`, Linux `.rpm`, and Arch packages
 - Background update checks against the GitHub release channel, plus install/restart controls in the desktop dashboard for packaged builds
 - Persistent config and state stored under app data
 - Optional launch-on-login support for Linux, Windows, and macOS so the home client can come up with the machine instead of requiring a manual app launch
@@ -32,9 +32,9 @@ Current scaffold status:
 
 Packaging targets:
 
-- Linux: `AppImage`, `deb`
+- Linux: `AppImage`, `deb`, `rpm`, `pacman`
 - Windows: `nsis`
-- macOS: `dmg`
+- macOS: universal `dmg`
 
 Install UX notes:
 
@@ -44,8 +44,16 @@ Install UX notes:
 - Packaged clients register the `worldstage://` protocol so `5310s.com` can hand a short-lived connection link directly into the installed app
 - The app can also accept the HTTPS fallback pairing link through the manual `Connect With Link` flow if the browser or OS does not pass the custom protocol through automatically
 - Packaged installs check `5310S/worldstage_client` GitHub releases for updates; tagged CI builds can publish those release artifacts directly from GitHub Actions
+- Tagged CI builds sync the package version from the release tag before packaging, then verify expected release artifact names and updater metadata before upload
+- macOS releases are built as a universal DMG and can be signed/notarized in CI when the Apple signing secrets are configured
 - Linux users should prefer the `AppImage` release when they want the easiest updater path; `.deb` remains available as a manual-install option
 
 Build command:
 
 - `npm run desktop:dist`
+
+Production release requirements:
+
+- Configure `CSC_LINK` and `CSC_KEY_PASSWORD` for macOS Developer ID signing
+- Configure either `APPLE_API_KEY`, `APPLE_API_KEY_ID`, and `APPLE_API_ISSUER`, or `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`, for macOS notarization
+- Publish from a `v*` tag, or run the desktop workflow manually with `publish_release` and a target `release_tag`

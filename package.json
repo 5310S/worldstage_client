@@ -1,7 +1,7 @@
 {
   "name": "worldstage-client",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.9",
   "description": "Background-capable WorldStage home client scaffold.",
   "repository": {
     "type": "git",
@@ -17,7 +17,7 @@
     "start": "electron .",
     "desktop:dist": "node scripts/worldstage-client-dist.js",
     "desktop:dist:dir": "node scripts/worldstage-client-dist.js --dir",
-    "test": "node tests/client-config.test.js && node tests/pairing-link.test.js && node tests/worldstage-auth.test.js && node tests/launch-on-login.test.js && node tests/client-state.test.js && node tests/client-workspace.test.js && node tests/control-plane.test.js && node tests/remote-intents.test.js && node tests/client-agent.test.js && node tests/worldstage-site-window.test.js && node tests/worldstage-client-ui.test.js && node tests/app-updater.test.js && node tests/worldstage-client-dist.test.js && node tests/worldstage-client-release-workflow.test.js"
+    "test": "node tests/client-config.test.js && node tests/pairing-link.test.js && node tests/worldstage-auth.test.js && node tests/launch-on-login.test.js && node tests/client-state.test.js && node tests/client-workspace.test.js && node tests/control-plane.test.js && node tests/remote-intents.test.js && node tests/client-agent.test.js && node tests/worldstage-site-window.test.js && node tests/worldstage-client-ui.test.js && node tests/app-updater.test.js && node tests/worldstage-client-dist.test.js && node tests/worldstage-client-release-version.test.js && node tests/worldstage-client-release-artifacts.test.js && node tests/worldstage-client-release-workflow.test.js"
   },
   "devDependencies": {
     "electron": "^41.1.1",
@@ -61,7 +61,10 @@
       "target": [
         "dmg"
       ],
-      "category": "public.app-category.entertainment"
+      "category": "public.app-category.entertainment",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true
     },
     "win": {
       "artifactName": "WorldStageClient-windows-${arch}.${ext}",
