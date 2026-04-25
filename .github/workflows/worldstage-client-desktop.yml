@@ -34,7 +34,7 @@ permissions:
 
 jobs:
   build:
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.target == 'all' || inputs.target == matrix.target }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
     name: Build ${{ matrix.target }} ${{ matrix.arch }}
     strategy:
       fail-fast: false
@@ -75,7 +75,7 @@ jobs:
       - name: Sync release package version
         run: node scripts/worldstage-client-release-version.js
         env:
-          WORLDSTAGE_CLIENT_RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag || '' }}
+          WORLDSTAGE_CLIENT_RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || github.event.inputs.release_tag || '' }}
 
       - name: Install dependencies
         run: npm ci
@@ -121,7 +121,7 @@ jobs:
           if-no-files-found: error
 
   publish-release:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release) }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_release == 'true') }}
     name: Publish GitHub release assets
     needs: build
     runs-on: ubuntu-latest
@@ -142,7 +142,7 @@ jobs:
             echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          release_tag="${{ inputs.release_tag }}"
+          release_tag="${{ github.event.inputs.release_tag }}"
           if [[ -z "${release_tag}" ]]; then
             echo "workflow_dispatch publishes require the release_tag input" >&2
             exit 1

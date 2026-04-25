@@ -15,6 +15,7 @@ async function main() {
   assert.match(workflow, /workflow_dispatch:/, 'Expected the workflow to support manual release backfills.');
   assert.match(workflow, /publish_release:/, 'Expected manual release publishes to require an explicit opt-in input.');
   assert.match(workflow, /release_tag:/, 'Expected manual release publishes to accept a target release tag.');
+  assert.doesNotMatch(workflow, /\$\{\{\s*inputs\./, 'Expected workflow expressions to use github.event.inputs so push events compile.');
   assert.match(workflow, /contents:\s*write/, 'Expected release workflow permissions to allow publishing GitHub release assets.');
   assert.match(workflow, /npm ci/, 'Expected the workflow to install dependencies reproducibly.');
   assert.match(workflow, /Sync release package version/, 'Expected release builds to sync package versions from release tags before npm ci.');
