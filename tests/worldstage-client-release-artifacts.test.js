@@ -10,6 +10,9 @@ const {
   resolveExpectedReleaseArtifacts,
   verifyReleaseArtifacts
 } = require('../scripts/verify-release-artifacts');
+const {
+  normalizeReleaseArtifacts
+} = require('../scripts/normalize-release-artifacts');
 
 function writeFile(filePath, content = '') {
   fs.mkdirSync(path.dirname(filePath), {
@@ -67,6 +70,45 @@ async function main() {
     releaseDir,
     requireMetadata: true
   }), /Unexpected release artifact/);
+
+  const linuxTmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'worldstage-release-linux-artifacts-'));
+  const linuxReleaseDir = path.join(linuxTmpDir, 'release');
+  writeFile(path.join(linuxTmpDir, 'package.json'), `${JSON.stringify({
+    name: 'worldstage-client',
+    version: '0.1.9'
+  }, null, 2)}\n`);
+  writeFile(path.join(linuxReleaseDir, 'WorldStageClient-linux-x86_64.AppImage'));
+  writeFile(path.join(linuxReleaseDir, 'WorldStageClient-linux-x86_64.AppImage.blockmap'));
+  writeFile(path.join(linuxReleaseDir, 'WorldStageClient-linux-amd64.deb'));
+  writeFile(path.join(linuxReleaseDir, 'WorldStageClient-linux-x86_64.rpm'));
+  writeFile(path.join(linuxReleaseDir, 'WorldStageClient-linux-x64.pacman'));
+  writeFile(path.join(linuxReleaseDir, 'latest-linux.yml'), [
+    'version: 0.1.9',
+    'files:',
+    '  - url: WorldStageClient-linux-x86_64.AppImage',
+    '    blockMapSize: 1',
+    '  - url: WorldStageClient-linux-amd64.deb',
+    '  - url: WorldStageClient-linux-x86_64.rpm',
+    'path: WorldStageClient-linux-x86_64.AppImage',
+    ''
+  ].join('\n'));
+
+  const normalizeResult = normalizeReleaseArtifacts({
+    cwd: linuxTmpDir,
+    releaseDir: linuxReleaseDir
+  });
+  assert.equal(normalizeResult.renamed.length, 4, 'Expected Linux aliases to be normalized to public release names.');
+  verifyReleaseArtifacts({
+    cwd: linuxTmpDir,
+    target: 'linux',
+    arch: 'x64',
+    releaseDir: linuxReleaseDir,
+    requireMetadata: true
+  });
+  const latestLinux = fs.readFileSync(path.join(linuxReleaseDir, 'latest-linux.yml'), 'utf8');
+  assert.match(latestLinux, /WorldStageClient-linux-x64\.AppImage/);
+  assert.match(latestLinux, /WorldStageClient-linux-x64\.deb/);
+  assert.match(latestLinux, /WorldStageClient-linux-x64\.rpm/);
 
   console.log('worldstage-client-release-artifacts.test.js: ok');
 }

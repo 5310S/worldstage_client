@@ -34,6 +34,8 @@ async function main() {
   assert.match(workflow, /worldstage-client-\$\{\{\s*matrix\.target\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}/, 'Expected build artifacts to be archived by target and architecture.');
   assert.match(workflow, /worldstage-client-\$\{\{\s*matrix\.target\s*\}\}-\$\{\{\s*matrix\.arch\s*\}\}-metadata/, 'Expected updater metadata artifacts to stay separate from packaged binaries.');
   assert.match(workflow, /npm run desktop:dist -- \$\{\{ matrix\.dist_args \}\}/, 'Expected the workflow to package through the desktop dist wrapper.');
+  assert.match(workflow, /Normalize release artifacts/, 'Expected release builds to normalize electron-builder artifact aliases before verification.');
+  assert.match(workflow, /scripts\/normalize-release-artifacts\.js/, 'Expected the workflow to run the artifact normalizer.');
   assert.match(workflow, /Verify release artifacts/, 'Expected release builds to verify artifacts before upload.');
   assert.match(workflow, /scripts\/verify-release-artifacts\.js \$\{\{ matrix\.target \}\} \$\{\{ matrix\.arch \}\} \$\{\{ matrix\.publish_update_metadata \}\}/, 'Expected artifact verification to use the matrix target, architecture, and metadata policy.');
   assert.match(workflow, /CSC_IDENTITY_AUTO_DISCOVERY:\s*'false'/, 'Expected the workflow to disable signing autodiscovery on CI by default.');

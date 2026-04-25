@@ -107,6 +107,10 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
           APPLE_TEAM_ID: ${{ (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch') && secrets.APPLE_TEAM_ID || '' }}
 
+      - name: Normalize release artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
+        run: node scripts/normalize-release-artifacts.js
+
       - name: Verify release artifacts
         if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.target == 'all' || github.event.inputs.target == matrix.target }}
         run: node scripts/verify-release-artifacts.js ${{ matrix.target }} ${{ matrix.arch }} ${{ matrix.publish_update_metadata }}
