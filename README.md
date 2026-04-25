@@ -38,7 +38,7 @@ Packaging targets:
 
 Install UX notes:
 
-- Windows NSIS is configured for a one-click install with desktop/start-menu shortcuts and auto-launch after setup
+- Windows NSIS is configured for an assisted install with desktop/start-menu shortcuts and a finish-page launch checkbox instead of silently auto-launching after setup
 - Linux packages expose desktop-entry metadata so the app behaves like a normal desktop application
 - The dashboard can apply the recommended background defaults in one action: keep running on close, launch on login, and auto-start the background agent
 - Packaged clients register the `worldstage://` protocol so `5310s.com` can hand a short-lived connection link directly into the installed app

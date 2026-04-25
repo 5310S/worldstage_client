@@ -22,10 +22,11 @@ Your job:
 1. In `worldstage_client`, run `npm test`.
 2. Build a packaged Windows installer with `npm run desktop:dist -- --win --x64`.
 3. Install that build on this Windows machine and verify:
-- NSIS one-click install works
+- NSIS assisted install reaches a successful finish page
+- finish page offers the launch checkbox so users can either open the app or close the installer
 - desktop shortcut exists
 - start menu shortcut exists
-- app auto-launches after install
+- app launches from the finish page only when the launch checkbox is selected
 - close-to-tray behavior works
 - launch-on-login works
 - pairing link flow works from the website or HTTPS fallback

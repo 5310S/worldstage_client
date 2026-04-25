@@ -89,7 +89,7 @@
       "maintainer": "5310S <worldstage@5310s.com>"
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
       "allowElevation": true,
       "createDesktopShortcut": "always",
