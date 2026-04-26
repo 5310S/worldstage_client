@@ -107,7 +107,7 @@ assert.deepEqual(
     visible: true,
     actionId: 'exit',
     label: 'X',
-    position: 'bottom-right'
+    position: 'top-right'
   }
 );
 

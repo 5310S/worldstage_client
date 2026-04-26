@@ -132,7 +132,6 @@ function buildWorldStageSiteUpdaterBannerModel(input = {}) {
 function buildWorldStageDesktopExitButtonModel(input = {}) {
   const source = input && typeof input === 'object' ? input : {};
   const platform = normalizeText(source.platform);
-  const pathname = normalizeText(source.pathname);
   const visible = source.exitButtonVisible === true || source.frameless === true;
   if (platform !== 'win32') {
     return {
@@ -150,7 +149,7 @@ function buildWorldStageDesktopExitButtonModel(input = {}) {
     visible: true,
     actionId: 'exit',
     label: 'X',
-    position: pathname === '/worldstage-login' ? 'top-right' : 'bottom-right'
+    position: 'top-right'
   };
 }
 
@@ -359,7 +358,7 @@ function shellControlsMarkup(model = {}) {
         font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
       }
       .wrap.top-right {
-        top: 18px;
+        top: 8px;
       }
       .wrap.bottom-right {
         bottom: 18px;

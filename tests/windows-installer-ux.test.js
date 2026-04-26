@@ -36,8 +36,8 @@ assert.equal(nsis.allowElevation, true, 'Installer should still be able to eleva
 assert.match(mainSource, /frame:\s*process\.platform\s*!==\s*'win32'/, 'Windows main window should be frameless so the native title row is not shown.');
 assert.match(mainSource, /ipcMain\.handle\('worldstage-site:exit-app'/, 'Windows frameless shell should expose an exit IPC handler.');
 assert.match(worldstageSitePreloadSource, /data-shell-action="exit"/, 'Windows frameless shell should render an in-page Exit button.');
-assert.match(worldstageSitePreloadSource, /bottom:\s*18px/, 'Exit button should be anchored near the bottom-right corner.');
-assert.match(worldstageSitePreloadSource, /top:\s*18px/, 'Exit button should support top-right placement on the login page.');
+assert.match(worldstageSitePreloadSource, /position:\s*'top-right'/, 'Exit button should be anchored at the top-right on login and authenticated pages.');
+assert.match(worldstageSitePreloadSource, /top:\s*8px/, 'Exit button should sit near the top-right window corner.');
 assert.match(worldstageSitePreloadSource, /border-radius:\s*50%/, 'Exit button should render as a circle.');
 
 assert.match(readme, /Windows NSIS is configured for an assisted install/, 'README should document the assisted Windows installer flow.');
