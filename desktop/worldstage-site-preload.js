@@ -129,12 +129,41 @@ function buildWorldStageSiteUpdaterBannerModel(input = {}) {
   };
 }
 
+function buildWorldStageDesktopExitButtonModel(input = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  const platform = normalizeText(source.platform);
+  const pathname = normalizeText(source.pathname);
+  const visible = source.exitButtonVisible === true || source.frameless === true;
+  if (platform !== 'win32') {
+    return {
+      visible: false,
+      reason: 'unsupported_platform'
+    };
+  }
+  if (!visible) {
+    return {
+      visible: false,
+      reason: 'native_chrome_available'
+    };
+  }
+  return {
+    visible: true,
+    actionId: 'exit',
+    label: 'X',
+    position: pathname === '/worldstage-login' ? 'top-right' : 'bottom-right'
+  };
+}
+
 const STATE_CHANNEL = 'worldstage-site:updater-state-changed';
 const ROOT_ID = 'worldstage-desktop-update-banner-root';
+const SHELL_ROOT_ID = 'worldstage-desktop-shell-root';
 
 let updaterState = null;
+let shellState = null;
 let bannerHost = null;
 let bannerShadow = null;
+let shellHost = null;
+let shellShadow = null;
 let renderQueued = false;
 let initialized = false;
 
@@ -144,6 +173,7 @@ function queueRender() {
   Promise.resolve().then(() => {
     renderQueued = false;
     renderBanner();
+    renderShellControls();
   });
 }
 
@@ -165,6 +195,18 @@ function ensureBannerShadow() {
     bannerShadow = bannerHost.shadowRoot || bannerHost.attachShadow({ mode: 'open' });
   }
   return bannerShadow;
+}
+
+function ensureShellShadow() {
+  const parent = document.body || document.documentElement;
+  if (!parent) return null;
+  if (!shellHost || !shellHost.isConnected) {
+    shellHost = document.createElement('div');
+    shellHost.id = SHELL_ROOT_ID;
+    parent.appendChild(shellHost);
+    shellShadow = shellHost.attachShadow({ mode: 'closed' });
+  }
+  return shellShadow;
 }
 
 function buttonMarkup(action, tone) {
@@ -301,6 +343,59 @@ function bannerMarkup(model) {
   `;
 }
 
+function shellControlsMarkup(model = {}) {
+  const label = normalizeText(model.label) || 'X';
+  const positionClass = model.position === 'top-right' ? 'top-right' : 'bottom-right';
+  return `
+    <style>
+      :host {
+        all: initial;
+      }
+      .wrap {
+        position: fixed;
+        right: 18px;
+        z-index: 2147483647;
+        pointer-events: none;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      }
+      .wrap.top-right {
+        top: 18px;
+      }
+      .wrap.bottom-right {
+        bottom: 18px;
+      }
+      .exit {
+        -webkit-app-region: no-drag;
+        appearance: none;
+        pointer-events: auto;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(8, 12, 20, 0.82);
+        color: #f6f0e1;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.34);
+        backdrop-filter: blur(12px);
+        cursor: pointer;
+        font: 800 12px/1 "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .exit:hover {
+        border-color: rgba(255, 210, 122, 0.62);
+        background: rgba(18, 22, 30, 0.94);
+      }
+      .exit:focus-visible {
+        outline: 2px solid #ffd27a;
+        outline-offset: 3px;
+      }
+    </style>
+    <div class="wrap ${positionClass}">
+      <button type="button" class="exit" data-shell-action="exit" aria-label="Exit WorldStage" title="Exit WorldStage">${label}</button>
+    </div>
+  `;
+}
+
 async function performBannerAction(actionId) {
   if (!actionId) return;
   if (actionId === 'install') {
@@ -328,6 +423,21 @@ function bindBannerActions(shadowRoot) {
   });
 }
 
+async function performShellAction(actionId) {
+  if (actionId === 'exit') {
+    await ipcRenderer.invoke('worldstage-site:exit-app');
+  }
+}
+
+function bindShellActions(shadowRoot) {
+  if (!shadowRoot) return;
+  shadowRoot.querySelectorAll('[data-shell-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      performShellAction(button.getAttribute('data-shell-action')).catch(() => {});
+    });
+  });
+}
+
 function renderBanner() {
   const shadowRoot = ensureBannerShadow();
   if (!bannerHost || !shadowRoot) return;
@@ -346,6 +456,25 @@ function renderBanner() {
   bannerHost.style.display = 'block';
   shadowRoot.innerHTML = bannerMarkup(model);
   bindBannerActions(shadowRoot);
+}
+
+function renderShellControls() {
+  const shadowRoot = ensureShellShadow();
+  if (!shellHost || !shadowRoot) return;
+  const model = buildWorldStageDesktopExitButtonModel({
+    ...shellState,
+    pathname: safePathname()
+  });
+
+  if (!model.visible) {
+    shellHost.style.display = 'none';
+    shadowRoot.innerHTML = '';
+    return;
+  }
+
+  shellHost.style.display = 'block';
+  shadowRoot.innerHTML = shellControlsMarkup(model);
+  bindShellActions(shadowRoot);
 }
 
 function installRouteHooks() {
@@ -389,11 +518,22 @@ function requestUpdaterState(attempt = 0) {
   });
 }
 
+function requestShellState(attempt = 0) {
+  ipcRenderer.invoke('worldstage-site:get-shell-state').then((state) => {
+    shellState = state;
+    queueRender();
+  }).catch(() => {
+    if (attempt >= 10) return;
+    window.setTimeout(() => requestShellState(attempt + 1), 250);
+  });
+}
+
 function initializeBanner() {
   if (initialized) return;
   initialized = true;
   installRouteHooks();
   requestUpdaterState();
+  requestShellState();
   ipcRenderer.on(STATE_CHANNEL, (_event, state) => {
     updaterState = state;
     queueRender();

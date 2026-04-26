@@ -8,6 +8,8 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const packageJson = require(path.join(root, 'package.json'));
 const packageSource = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
+const mainSource = fs.readFileSync(path.join(root, 'desktop', 'main.js'), 'utf8');
+const worldstageSitePreloadSource = fs.readFileSync(path.join(root, 'desktop', 'worldstage-site-preload.js'), 'utf8');
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
 const releaseHandoff = fs.readFileSync(path.join(root, 'RELEASE_HANDOFF_WINDOWS_MAC.txt'), 'utf8');
 
@@ -30,6 +32,13 @@ assert.equal(nsis.createDesktopShortcut, 'always', 'Installer should still creat
 assert.equal(nsis.createStartMenuShortcut, true, 'Installer should still create a Start Menu shortcut.');
 assert.equal(nsis.perMachine, false, 'Installer should remain a per-user install by default.');
 assert.equal(nsis.allowElevation, true, 'Installer should still be able to elevate when needed.');
+
+assert.match(mainSource, /frame:\s*process\.platform\s*!==\s*'win32'/, 'Windows main window should be frameless so the native title row is not shown.');
+assert.match(mainSource, /ipcMain\.handle\('worldstage-site:exit-app'/, 'Windows frameless shell should expose an exit IPC handler.');
+assert.match(worldstageSitePreloadSource, /data-shell-action="exit"/, 'Windows frameless shell should render an in-page Exit button.');
+assert.match(worldstageSitePreloadSource, /bottom:\s*18px/, 'Exit button should be anchored near the bottom-right corner.');
+assert.match(worldstageSitePreloadSource, /top:\s*18px/, 'Exit button should support top-right placement on the login page.');
+assert.match(worldstageSitePreloadSource, /border-radius:\s*50%/, 'Exit button should render as a circle.');
 
 assert.match(readme, /Windows NSIS is configured for an assisted install/, 'README should document the assisted Windows installer flow.');
 assert.match(readme, /finish-page launch checkbox/, 'README should mention the finish-page launch checkbox.');

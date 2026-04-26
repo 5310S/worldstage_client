@@ -55,6 +55,61 @@ vm.runInContext(preloadSource, sandbox, {
 });
 
 assert.equal(typeof sandbox.buildWorldStageSiteUpdaterBannerModel, 'function', 'Expected preload to keep the banner model locally.');
+assert.equal(typeof sandbox.buildWorldStageDesktopExitButtonModel, 'function', 'Expected preload to keep the desktop exit control model locally.');
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopExitButtonModel({
+    platform: 'linux',
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    visible: false,
+    reason: 'unsupported_platform'
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopExitButtonModel({
+    platform: 'win32',
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    visible: false,
+    reason: 'native_chrome_available'
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopExitButtonModel({
+    platform: 'win32',
+    frameless: true,
+    exitButtonVisible: true,
+    pathname: '/worldstage-login'
+  }),
+  {
+    visible: true,
+    actionId: 'exit',
+    label: 'X',
+    position: 'top-right'
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopExitButtonModel({
+    platform: 'win32',
+    frameless: true,
+    exitButtonVisible: true,
+    pathname: '/worldstage'
+  }),
+  {
+    visible: true,
+    actionId: 'exit',
+    label: 'X',
+    position: 'bottom-right'
+  }
+);
 
 const cases = [
   {

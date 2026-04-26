@@ -1,7 +1,7 @@
 {
   "name": "worldstage-client",
   "private": true,
-  "version": "0.1.10",
+  "version": "0.1.11",
   "description": "Background-capable WorldStage home client scaffold.",
   "repository": {
     "type": "git",

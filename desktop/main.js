@@ -221,6 +221,21 @@ function worldstageUpdaterState() {
   };
 }
 
+function worldstageShellState() {
+  const frameless = process.platform === 'win32';
+  return {
+    platform: process.platform,
+    frameless,
+    exitButtonVisible: frameless
+  };
+}
+
+function requestAppQuit() {
+  if (isQuitting) return false;
+  app.quit();
+  return true;
+}
+
 function pushWorldStageUpdaterState() {
   if (!worldstageSiteWindow || worldstageSiteWindow.isDestroyed()) return;
   worldstageSiteWindow.webContents.send('worldstage-site:updater-state-changed', worldstageUpdaterState());
@@ -455,6 +470,7 @@ function createMainWindow() {
     height: 960,
     minWidth: 1100,
     minHeight: 760,
+    frame: process.platform !== 'win32',
     backgroundColor: '#050811',
     title: 'WorldStage',
     autoHideMenuBar: true,
@@ -619,8 +635,7 @@ function refreshTrayMenu() {
     {
       label: 'Quit',
       click: () => {
-        isQuitting = true;
-        app.quit();
+        requestAppQuit();
       }
     }
   ]);
@@ -894,6 +909,13 @@ function registerIpc() {
     if (!updater) throw new Error('updater_unavailable');
     await updater.openReleasePage();
     return worldstageUpdaterState();
+  });
+  ipcMain.handle('worldstage-site:get-shell-state', async () => {
+    return worldstageShellState();
+  });
+  ipcMain.handle('worldstage-site:exit-app', async () => {
+    requestAppQuit();
+    return worldstageShellState();
   });
   ipcMain.handle('client:open-worldstage', async () => openWorldStageWindow());
   ipcMain.handle('client:reload-worldstage', async () => reloadWorldStageWindow());
