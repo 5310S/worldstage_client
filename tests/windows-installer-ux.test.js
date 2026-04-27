@@ -10,6 +10,7 @@ const packageJson = require(path.join(root, 'package.json'));
 const packageSource = fs.readFileSync(path.join(root, 'package.json'), 'utf8');
 const mainSource = fs.readFileSync(path.join(root, 'desktop', 'main.js'), 'utf8');
 const worldstageSitePreloadSource = fs.readFileSync(path.join(root, 'desktop', 'worldstage-site-preload.js'), 'utf8');
+const worldstagePageSource = fs.readFileSync(path.join(root, 'desktop', 'worldstage', 'worldstage.html'), 'utf8');
 const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
 const releaseHandoff = fs.readFileSync(path.join(root, 'RELEASE_HANDOFF_WINDOWS_MAC.txt'), 'utf8');
 
@@ -37,8 +38,25 @@ assert.match(mainSource, /frame:\s*process\.platform\s*!==\s*'win32'/, 'Windows 
 assert.match(mainSource, /ipcMain\.handle\('worldstage-site:exit-app'/, 'Windows frameless shell should expose an exit IPC handler.');
 assert.match(worldstageSitePreloadSource, /data-shell-action="exit"/, 'Windows frameless shell should render an in-page Exit button.');
 assert.match(worldstageSitePreloadSource, /position:\s*'top-right'/, 'Exit button should be anchored at the top-right on login and authenticated pages.');
-assert.match(worldstageSitePreloadSource, /top:\s*8px/, 'Exit button should sit near the top-right window corner.');
-assert.match(worldstageSitePreloadSource, /border-radius:\s*50%/, 'Exit button should render as a circle.');
+assert.match(worldstageSitePreloadSource, /top:\s*0/, 'Exit button should sit flush against the top window edge.');
+assert.match(worldstageSitePreloadSource, /right:\s*0/, 'Exit button should sit flush against the right window edge.');
+assert.match(worldstageSitePreloadSource, /border-left:\s*1px solid/, 'Exit button should draw its visible left edge.');
+assert.match(worldstageSitePreloadSource, /border-bottom:\s*1px solid/, 'Exit button should draw its visible bottom edge.');
+assert.match(worldstageSitePreloadSource, /border-top:\s*0/, 'Exit button should use the top window edge instead of drawing a top border.');
+assert.match(worldstageSitePreloadSource, /border-right:\s*0/, 'Exit button should use the right window edge instead of drawing a right border.');
+assert.match(worldstageSitePreloadSource, /buildWorldStageDesktopDragModel/, 'Windows frameless shell should model draggable window support.');
+assert.match(worldstageSitePreloadSource, /-webkit-app-region:\s*drag/, 'Windows frameless shell should make non-control page regions draggable.');
+assert.match(worldstageSitePreloadSource, /-webkit-app-region:\s*no-drag/, 'Windows frameless shell should keep controls clickable inside draggable windows.');
+assert.match(mainSource, /desktopClient:\s*true/, 'WorldStage site shell state should mark that it is running in the desktop client.');
+assert.match(worldstageSitePreloadSource, /Download World\\nStage Local Client|download world stage local client/i, 'Desktop client should identify the public local-client download button.');
+assert.match(worldstageSitePreloadSource, /CLIENT_DOWNLOAD_HIDDEN_ATTR/, 'Desktop client should hide the redundant local-client download button.');
+assert.match(worldstageSitePreloadSource, /worldstage-desktop-client-nav-layout/, 'Desktop client should install a dedicated responsive nav layout.');
+assert.match(worldstageSitePreloadSource, /worldstage-topbar-center[\s\S]*left:\s*50%/, 'Desktop nav search should stay centered in the window.');
+assert.doesNotMatch(worldstageSitePreloadSource, /worldStageDesktopNavLeftButtonCount/, 'Desktop nav should not move buttons between containers with measurement-driven layout code.');
+assert.match(worldstageSitePreloadSource, /#worldstage-hosted-videos[\s\S]*display:\s*none/, 'Desktop client should hide the redundant topbar Hosted Videos button from the hosted page.');
+assert.doesNotMatch(worldstagePageSource, /id="worldstage-hosted-videos"/, 'Bundled WorldStage page should not render the redundant topbar Hosted Videos button.');
+assert.match(worldstageSitePreloadSource, /@media\s*\(max-width:\s*900px\)/, 'Desktop nav should include tablet-specific layout rules.');
+assert.match(worldstageSitePreloadSource, /@media\s*\(max-width:\s*700px\)/, 'Desktop nav should include mobile-specific layout rules.');
 
 assert.match(readme, /Windows NSIS is configured for an assisted install/, 'README should document the assisted Windows installer flow.');
 assert.match(readme, /finish-page launch checkbox/, 'README should mention the finish-page launch checkbox.');

@@ -56,6 +56,11 @@ vm.runInContext(preloadSource, sandbox, {
 
 assert.equal(typeof sandbox.buildWorldStageSiteUpdaterBannerModel, 'function', 'Expected preload to keep the banner model locally.');
 assert.equal(typeof sandbox.buildWorldStageDesktopExitButtonModel, 'function', 'Expected preload to keep the desktop exit control model locally.');
+assert.equal(typeof sandbox.buildWorldStageDesktopDragModel, 'function', 'Expected preload to keep the desktop drag model locally.');
+assert.equal(typeof sandbox.buildWorldStageDesktopClientDownloadControlModel, 'function', 'Expected preload to keep the client download control model locally.');
+assert.equal(typeof sandbox.isWorldStageClientDownloadControl, 'function', 'Expected preload to keep the client download control matcher locally.');
+assert.equal(typeof sandbox.isWorldStageHostedVideosNavControl, 'function', 'Expected preload to keep the hosted videos nav matcher locally.');
+assert.equal(typeof sandbox.buildWorldStageDesktopNavLayoutModel, 'function', 'Expected preload to keep the desktop nav layout model locally.');
 
 assert.deepEqual(
   sandbox.buildWorldStageDesktopExitButtonModel({
@@ -108,6 +113,185 @@ assert.deepEqual(
     actionId: 'exit',
     label: 'X',
     position: 'top-right'
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopDragModel({
+    platform: 'linux',
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    enabled: false,
+    reason: 'unsupported_platform'
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopDragModel({
+    platform: 'win32',
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    enabled: false,
+    reason: 'native_chrome_available'
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopDragModel({
+    platform: 'win32',
+    frameless: true,
+    exitButtonVisible: false
+  }),
+  {
+    enabled: true
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopDragModel({
+    platform: 'win32',
+    frameless: false,
+    exitButtonVisible: true
+  }),
+  {
+    enabled: true
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopClientDownloadControlModel({
+    desktopClient: true,
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    hidden: true
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopClientDownloadControlModel({
+    desktopClient: false,
+    frameless: true,
+    exitButtonVisible: false
+  }),
+  {
+    hidden: true
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopClientDownloadControlModel({
+    desktopClient: false,
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    hidden: false,
+    reason: 'browser_context'
+  }
+);
+
+assert.equal(
+  sandbox.isWorldStageClientDownloadControl({
+    textContent: 'Download World\nStage Local Client',
+    getAttribute() {
+      return '';
+    }
+  }),
+  true
+);
+
+assert.equal(
+  sandbox.isWorldStageClientDownloadControl({
+    textContent: 'Get the client',
+    getAttribute(name) {
+      return name === 'href' ? '/downloads/worldstage-client/windows' : '';
+    }
+  }),
+  true
+);
+
+assert.equal(
+  sandbox.isWorldStageClientDownloadControl({
+    textContent: 'My Account',
+    getAttribute() {
+      return '/worldstage/account';
+    }
+  }),
+  false
+);
+
+assert.equal(
+  sandbox.isWorldStageHostedVideosNavControl({
+    id: 'worldstage-hosted-videos',
+    textContent: 'Hosted Videos',
+    className: 'worldstage-topbar-btn worldstage-topbar-btn-neutral',
+    getAttribute() {
+      return '';
+    }
+  }),
+  true
+);
+
+assert.equal(
+  sandbox.isWorldStageHostedVideosNavControl({
+    textContent: 'Hosted Videos',
+    className: 'worldstage-topbar-btn worldstage-topbar-btn-neutral',
+    getAttribute() {
+      return '';
+    }
+  }),
+  true
+);
+
+assert.equal(
+  sandbox.isWorldStageHostedVideosNavControl({
+    textContent: 'Hosted Videos',
+    className: 'worldstage-account-menu-trigger',
+    getAttribute() {
+      return '';
+    }
+  }),
+  false,
+  'Only the redundant topbar Hosted Videos control should be hidden.'
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopNavLayoutModel({
+    desktopClient: true,
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    enabled: true
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopNavLayoutModel({
+    desktopClient: false,
+    frameless: true,
+    exitButtonVisible: false
+  }),
+  {
+    enabled: true
+  }
+);
+
+assert.deepEqual(
+  sandbox.buildWorldStageDesktopNavLayoutModel({
+    desktopClient: false,
+    frameless: false,
+    exitButtonVisible: false
+  }),
+  {
+    enabled: false,
+    reason: 'browser_context'
   }
 );
 

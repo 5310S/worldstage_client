@@ -225,6 +225,7 @@ function worldstageShellState() {
   const frameless = process.platform === 'win32';
   return {
     platform: process.platform,
+    desktopClient: true,
     frameless,
     exitButtonVisible: frameless
   };
